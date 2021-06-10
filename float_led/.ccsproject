@@ -4,4 +4,5 @@
 	<deviceFamily value="C2000"/>
 	<isTargetManual value="false"/>
 	<origin value="C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/examples/structs/cpu_timer"/>
+	<connection value="common/targetdb/connections/TIXDS100v2_Connection.xml"/>
 </projectOptions>

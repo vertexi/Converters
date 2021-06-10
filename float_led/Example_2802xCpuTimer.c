@@ -104,6 +104,11 @@ __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
 __interrupt void cpu_timer2_isr(void);
 
+void Gpio_init(void);
+void Gpio_example1(void);
+
+int led_matrix[4];
+
 //
 // Main
 //
@@ -124,6 +129,8 @@ void main(void)
     // This example function is found in the f2802x_SysCtrl.c file.
     //
     InitSysCtrl();
+
+    Gpio_init();
 
     //
     // Step 2. Initialize GPIO:
@@ -257,6 +264,7 @@ cpu_timer0_isr(void)
     //
     // Acknowledge this interrupt to receive more interrupts from group 1
     //
+    Gpio_example1();
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 
@@ -290,6 +298,43 @@ cpu_timer2_isr(void)
 }
 
 //
+// Gpio_select-
+//
+void
+Gpio_init(void)
+{
+    EALLOW;
+    GpioCtrlRegs.GPAMUX1.all = 0x00000000;  // All GPIO
+    GpioCtrlRegs.GPAMUX2.all = 0x00000000;  // All GPIO
+    GpioCtrlRegs.GPAMUX1.all = 0x00000000;  // All GPIO
+    GpioCtrlRegs.GPADIR.all = 0xFFFFFFFF;   // All outputs
+    GpioCtrlRegs.GPBDIR.all = 0x0000000F;   // All outputs
+    EDIS;
+
+    GpioDataRegs.GPACLEAR.all  = 0xFFFFFFFF;
+    GpioDataRegs.GPASET.bit.GPIO0 = 1;
+
+    memset(led_matrix, 0, 4*sizeof(led_matrix[0]));
+    led_matrix[0] = 1;
+    led_matrix[1] = 2;
+    led_matrix[2] = 4;
+    led_matrix[3] = 8;
+}
+
+//
 // End of File
 //
-
+int time_count = 0;
+void Gpio_example1(void)
+{
+    time_count++;
+    if (time_count == 4)
+    {
+        GpioDataRegs.GPATOGGLE.all |= led_matrix[3];
+        time_count = 0;
+    } else
+    {
+        GpioDataRegs.GPATOGGLE.all |= led_matrix[time_count-1];
+    }
+    GpioDataRegs.GPATOGGLE.all |= led_matrix[time_count];
+}

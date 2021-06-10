@@ -10,7 +10,8 @@ C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/headers/cmd/F2802x
 C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/cmd/F2802x_generic_ram.cmd 
 
 LIB_SRCS += \
-../IQmath.lib 
+../IQmath.lib \
+../IQmath_fpu32.lib 
 
 ASM_SRCS += \
 C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/source/f2802x_codestartbranch.asm \
@@ -74,6 +75,7 @@ ASM_DEPS__QUOTED += \
 "f2802x_usdelay.d" 
 
 C_SRCS__QUOTED += \
+"../Example_2802xCpuTimer.c" \
 "C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/headers/source/F2802x_GlobalVariableDefs.c" \
 "C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/source/f2802x_cputimers.c" \
 "C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/source/f2802x_defaultisr.c" \
