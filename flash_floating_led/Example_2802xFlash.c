@@ -147,9 +147,11 @@
 // the linker cmd file.
 //
 #pragma CODE_SECTION(epwm1_isr, "ramfuncs");
-#pragma CODE_SECTION(AdcOffsetSelfCal, "ramfuncs");
-#pragma CODE_SECTION(AdcChanSelect, "ramfuncs");
-#pragma CODE_SECTION(AdcConversion, "ramfuncs");
+//#pragma CODE_SECTION(AdcOffsetSelfCal, "ramfuncs");
+//#pragma CODE_SECTION(AdcChanSelect, "ramfuncs");
+//#pragma CODE_SECTION(AdcConversion, "ramfuncs");
+#pragma CODE_SECTION(adc1_isr, "ramfuncs");
+#pragma CODE_SECTION(adc2_isr, "ramfuncs");
 
 //
 // Function Prototypes
@@ -197,7 +199,8 @@ extern uint16_t RamfuncsRunStart;
 //
 // Function Prototypes
 //
-__interrupt void adc_isr(void);
+__interrupt void adc1_isr(void);
+__interrupt void adc2_isr(void);
 void Adc_Config(void);
 
 //
@@ -207,7 +210,10 @@ uint16_t LoopCount;
 uint16_t ConversionCount;
 float Voltage1[10];
 float Voltage2[10];
+float Voltage0[10];
 
+#define VOL_SLOPE 0.00238342
+#define CURRENT_SLOPE 0.0014641868
 //
 // Main
 //
@@ -330,7 +336,7 @@ void main(void)
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
   //
   ConfigCpuTimer(&CpuTimer0, 60, 10000);
-  ConfigCpuTimer(&CpuTimer1, 60, 10000);
+  ConfigCpuTimer(&CpuTimer1, 60, 10000000);
   ConfigCpuTimer(&CpuTimer2, 60, 10000);
 #endif
   //
@@ -370,7 +376,8 @@ void main(void)
   // ISR functions found within this file.
   //
   EALLOW;             // This is needed to write to EALLOW protected register
-  PieVectTable.ADCINT1 = &adc_isr;
+  PieVectTable.ADCINT1 = &adc1_isr;
+  PieVectTable.ADCINT2 = &adc2_isr;
   EDIS;      // This is needed to disable write to EALLOW protected registers
 
   //
@@ -385,6 +392,7 @@ void main(void)
   // Enable ADCINT1 in PIE
   //
   PieCtrlRegs.PIEIER1.bit.INTx1 = 1; // Enable INT 1.1 in the PIE
+  PieCtrlRegs.PIEIER1.bit.INTx2 = 1; // Enable INT 1.2 in the PIE
   IER |= M_INT1;                     // Enable CPU Interrupt 1
   EINT;                              // Enable Global interrupt INTM
   ERTM;                              // Enable Global realtime interrupt DBGM
@@ -408,17 +416,21 @@ void main(void)
   AdcRegs.INTSEL1N2.bit.INT1E     = 1;    // Enabled ADCINT1
   AdcRegs.INTSEL1N2.bit.INT1CONT  = 0;    // Disable ADCINT1 Continuous mode
 
+  AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
+  AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
+
   // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
   //
   // setup EOC2 to trigger ADCINT1 to fire
   //
   AdcRegs.INTSEL1N2.bit.INT1SEL   = 2;
+  AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
 
   // 设定 SOC 的采样源引脚
   //
   // set SOC0 channel select to ADCINA4
   //
-  //    AdcRegs.ADCSOC0CTL.bit.CHSEL  = 4;
+  AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
 
   //
   // set SOC1 channel select to ADCINA4
@@ -436,7 +448,7 @@ void main(void)
   // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
   // then SOC1
   //
-  //    AdcRegs.ADCSOC0CTL.bit.TRIGSEL    = 0;
+  AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 2;
 
   //
   // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
@@ -454,11 +466,12 @@ void main(void)
   //
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
-  //    AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
+  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
 
   //
   // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
+  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
   AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
 
   //
@@ -577,14 +590,14 @@ void InitEPwm1Example()
 //
 // adc_isr -
 //
-__interrupt void adc_isr(void)
+__interrupt void adc1_isr(void)
 {
   //
   // discard ADCRESULT0 as part of the workaround to the 1st sample errata
   // for rev0
   //
-  Voltage1[ConversionCount] = (AdcResult.ADCRESULT1/4096.0)*3.3;
-  Voltage2[ConversionCount] = (AdcResult.ADCRESULT2/4096.0)*3.3;
+  Voltage1[ConversionCount] = AdcResult.ADCRESULT1*VOL_SLOPE;
+  Voltage2[ConversionCount] = AdcResult.ADCRESULT2*CURRENT_SLOPE;
 
   //
   // If 20 conversions have been logged, start over
@@ -611,6 +624,11 @@ __interrupt void adc_isr(void)
   return;
 }
 
+__interrupt void adc2_isr(void)
+{
+  Voltage0[ConversionCount] = (AdcResult.ADCRESULT0/4096.0)*3.3;
+
+}
 //
 // cpu_timer0_isr -
 //
