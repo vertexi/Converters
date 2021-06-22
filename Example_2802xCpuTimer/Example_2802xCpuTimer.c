@@ -246,6 +246,13 @@ void main(void)
     for(;;);
 }
 
+void InitPWM(void)
+{
+    GpioCtrlRegs.GPAMUX1.bit.GPIO0 = 1;
+    GpioCtrlRegs.GPAMUX1.bit.GPIO1 = 1;
+}
+
+
 //
 // cpu_timer0_isr - 
 //

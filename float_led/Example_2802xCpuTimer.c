@@ -119,9 +119,9 @@ void main(void)
     // RAM InitSysCtrl includes a call to a RAM based function and without a 
     // call to memcpy first, the processor will go "into the weeds"
     //
-#ifdef _FLASH
+//#ifdef _FLASH
     memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
-#endif
+//#endif
 
     //
     // Step 1. Initialize System Control:
