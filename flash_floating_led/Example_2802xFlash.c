@@ -205,7 +205,7 @@ void Adc_Config(void);
 //
 uint16_t LoopCount;
 uint16_t ConversionCount;
-uint16_t Voltage1[10];
+float Voltage1[10];
 float Voltage2[10];
 
 //
@@ -266,19 +266,6 @@ void main(void)
   //
   InitPieVectTable();
 
-  //
-    // Interrupts that are used in this example are re-mapped to
-    // ISR functions found within this file.
-    //
-    EALLOW;             // This is needed to write to EALLOW protected register
-    PieVectTable.ADCINT1 = &adc_isr;
-    EDIS;      // This is needed to disable write to EALLOW protected registers
-
-    //
-    // Step 4. Initialize all the Device Peripherals
-    //
-    InitAdc();  // For this example, init the ADC
-    //AdcOffsetSelfCal();
 
   /*--------------------- for epwm1 initialization ------------------------*/
   //
@@ -378,7 +365,19 @@ void main(void)
 
   /*--------------------- for ADC initialization ------------------------*/
 
+  //
+  // Interrupts that are used in this example are re-mapped to
+  // ISR functions found within this file.
+  //
+  EALLOW;             // This is needed to write to EALLOW protected register
+  PieVectTable.ADCINT1 = &adc_isr;
+  EDIS;      // This is needed to disable write to EALLOW protected registers
 
+  //
+  // Step 4. Initialize all the Device Peripherals
+  //
+  InitAdc();  // For this example, init the ADC
+  //AdcOffsetSelfCal();
 
   // 使能ADCINT1为INT1.1
   //
@@ -424,12 +423,12 @@ void main(void)
   //
   // set SOC1 channel select to ADCINA4
   //
-  //    AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
+  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
 
   //
   // set SOC1 channel select to ADCINA2
   //
-  AdcRegs.ADCSOC2CTL.bit.CHSEL    = 2;
+  AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
 
   // 设置为 EOC 采样的触发条件，5为epwm1 soca
   // 现在我想要全手动软件控制，即为 0 ， software only.
@@ -443,7 +442,7 @@ void main(void)
   // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
   // then SOC1
   //
-  //    AdcRegs.ADCSOC1CTL.bit.TRIGSEL    = 0;
+  AdcRegs.ADCSOC1CTL.bit.TRIGSEL  = 1;
 
   //
   // set SOC2 start trigger on EPWM1A, due to round-robin SOC0 converts first
@@ -460,12 +459,12 @@ void main(void)
   //
   // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
-  //    AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
+  AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
 
   //
   // set SOC2 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
-  AdcRegs.ADCSOC2CTL.bit.ACQPS    = 6;
+  AdcRegs.ADCSOC2CTL.bit.ACQPS  = 6;
   EDIS;
 
   for(;;)
@@ -584,7 +583,7 @@ __interrupt void adc_isr(void)
   // discard ADCRESULT0 as part of the workaround to the 1st sample errata
   // for rev0
   //
-  //    Voltage1[ConversionCount] = AdcResult.ADCRESULT1;
+  Voltage1[ConversionCount] = (AdcResult.ADCRESULT1/4096.0)*3.3;
   Voltage2[ConversionCount] = (AdcResult.ADCRESULT2/4096.0)*3.3;
 
   //
