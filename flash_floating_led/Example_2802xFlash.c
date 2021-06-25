@@ -170,7 +170,6 @@ __interrupt void epwm1_isr(void);
 // Globals
 //
 uint32_t  EPwm1TimerIntCount;
-
 uint16_t  EPwm1_DB_Direction;
 
 
@@ -178,8 +177,9 @@ uint16_t  EPwm1_DB_Direction;
 // Defines for the maximum Dead Band values
 //
 #define EPWM1_MAX_DB   0x03FF
+#define EPWM1_MIN_DB   0x0000
+#define EPWN1_PRD 300
 
-#define EPWM1_MIN_DB   0x0020
 
 
 //
@@ -208,12 +208,15 @@ void Adc_Config(void);
 //
 uint16_t LoopCount;
 uint16_t ConversionCount;
-float Voltage1[10];
-float Voltage2[10];
-float Voltage0[10];
+float Voltage1[5];
+float Voltage2[5];
 
 #define VOL_SLOPE 0.00238342
 #define CURRENT_SLOPE 0.0014641868
+
+void initPWM();
+void initTimer();
+void initMyAdc();
 //
 // Main
 //
@@ -224,7 +227,6 @@ void main(void)
   // RAM InitSysCtrl includes a call to a RAM based function and without a
   // call to memcpy first, the processor will go "into the weeds"
   //
-
   memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
 
   //
@@ -240,7 +242,6 @@ void main(void)
   // illustrates how to set the GPIO to it's default state.
   //
   //InitGpio();  // Skipped for this example
-  InitEPwm1Gpio();
 
   //
   // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -272,219 +273,234 @@ void main(void)
   //
   InitPieVectTable();
 
+  initMyAdc();
 
-  /*--------------------- for epwm1 initialization ------------------------*/
-  //
-  // Interrupts that are used in this example are re-mapped to
-  // ISR functions found within this file.
-  //
-  EALLOW;            // This is needed to write to EALLOW protected registers
-  PieVectTable.EPWM1_INT = &epwm1_isr;
-  EDIS;      // This is needed to disable write to EALLOW protected registers
+  InitEPwm1Gpio();
 
-  //
-  // Step 4. Initialize all the Device Peripherals:
-  // Not required for this example
-  //
-  EALLOW;
-  SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 0;
-  EDIS;
+  initPWM();
 
-  InitEPwm1Example();
-
-  EALLOW;
-  SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;
-  EDIS;
-
-  //
-  // Step 5. User specific code, enable interrupts
-  // Initialize counters
-  //
-  EPwm1TimerIntCount = 0;
-
-  //
-  // Enable CPU INT3 which is connected to EPWM1-3 INT
-  //
-  IER |= M_INT3;
-
-  //
-  // Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
-  //
-  PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
-
-  /*--------------------- for timers initialization ------------------------*/
-
-  //
-  // Interrupts that are used in this example are re-mapped to
-  // ISR functions found within this file.
-  //
-  EALLOW;            // This is needed to write to EALLOW protected registers
-  PieVectTable.TINT0 = &cpu_timer0_isr;
-  PieVectTable.TINT1 = &cpu_timer1_isr;
-  PieVectTable.TINT2 = &cpu_timer2_isr;
-  EDIS;      // This is needed to disable write to EALLOW protected registers
-
-  //
-  // Step 4. Initialize the Device Peripheral. This function can be
-  //         found in f2802x_CpuTimers.c
-  //
-  InitCpuTimers();        // For this example, only initialize the Cpu Timers
-
-#if (CPU_FRQ_60MHZ)
-  //
-  // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
-  // 60MHz CPU Freq, 1 second Period (in uSeconds)
-  //
-  ConfigCpuTimer(&CpuTimer0, 60, 10000);
-  ConfigCpuTimer(&CpuTimer1, 60, 10000000);
-  ConfigCpuTimer(&CpuTimer2, 60, 10000);
-#endif
-  //
-  // To ensure precise timing, use write-only instructions to write to the
-  // entire register. Therefore, if any of the configuration bits are changed
-  // in ConfigCpuTimer and InitCpuTimers (in f2802x_CpuTimers.h), the
-  // below settings must also be updated.
-  //
-  CpuTimer0Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
-  CpuTimer1Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
-  CpuTimer2Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
-
-  //
-  // Enable CPU int1 which is connected to CPU-Timer 0, CPU int13
-  // which is connected to CPU-Timer 1, and CPU int 14, which is connected
-  // to CPU-Timer 2:
-  //
-  IER |= M_INT1;
-  IER |= M_INT13;
-  IER |= M_INT14;
-
-  //
-  // Enable TINT0 in the PIE: Group 1 interrupt 7
-  //
-  PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
-
-  //
-  // Enable global Interrupts and higher priority real-time debug events
-  //
-  EINT;               // Enable Global interrupt INTM
-  ERTM;               // Enable Global realtime interrupt DBGM
-
-  /*--------------------- for ADC initialization ------------------------*/
-
-  //
-  // Interrupts that are used in this example are re-mapped to
-  // ISR functions found within this file.
-  //
-  EALLOW;             // This is needed to write to EALLOW protected register
-  PieVectTable.ADCINT1 = &adc1_isr;
-  PieVectTable.ADCINT2 = &adc2_isr;
-  EDIS;      // This is needed to disable write to EALLOW protected registers
-
-  //
-  // Step 4. Initialize all the Device Peripherals
-  //
-  InitAdc();  // For this example, init the ADC
-  //AdcOffsetSelfCal();
-
-  // 使能ADCINT1为INT1.1
-  //
-  // Step 5. User specific code, enable interrupts:
-  // Enable ADCINT1 in PIE
-  //
-  PieCtrlRegs.PIEIER1.bit.INTx1 = 1; // Enable INT 1.1 in the PIE
-  PieCtrlRegs.PIEIER1.bit.INTx2 = 1; // Enable INT 1.2 in the PIE
-  IER |= M_INT1;                     // Enable CPU Interrupt 1
-  EINT;                              // Enable Global interrupt INTM
-  ERTM;                              // Enable Global realtime interrupt DBGM
-
-  LoopCount = 0;
-  ConversionCount = 0;
-
-  //
-  // Configure ADC
-  // Note: Channel ADCINA4  will be double sampled to workaround the ADC 1st
-  // sample issue for rev0 silicon errata
-  //
-  EALLOW;
-
-  // 设定ADC采样完成后触发中断，且需用户手动CLEAR FLAG后才能再次触发中断(non-continus mode)
-  //
-  // ADCINT1 trips after AdcResults latch
-  //
-  AdcRegs.ADCCTL1.bit.INTPULSEPOS = 1;
-
-  AdcRegs.INTSEL1N2.bit.INT1E     = 1;    // Enabled ADCINT1
-  AdcRegs.INTSEL1N2.bit.INT1CONT  = 0;    // Disable ADCINT1 Continuous mode
-
-  AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
-  AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
-
-  // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
-  //
-  // setup EOC2 to trigger ADCINT1 to fire
-  //
-  AdcRegs.INTSEL1N2.bit.INT1SEL   = 2;
-  AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
-
-  // 设定 SOC 的采样源引脚
-  //
-  // set SOC0 channel select to ADCINA4
-  //
-  AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
-
-  //
-  // set SOC1 channel select to ADCINA4
-  //
-  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
-
-  //
-  // set SOC1 channel select to ADCINA2
-  //
-  AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
-
-  // 设置为 EOC 采样的触发条件，5为epwm1 soca
-  // 现在我想要全手动软件控制，即为 0 ， software only.
-  //
-  // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
-  // then SOC1
-  //
-  AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 2;
-
-  //
-  // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
-  // then SOC1
-  //
-  AdcRegs.ADCSOC1CTL.bit.TRIGSEL  = 1;
-
-  //
-  // set SOC2 start trigger on EPWM1A, due to round-robin SOC0 converts first
-  // then SOC1, then SOC2
-  //
-  AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 1;
-
-  // 设置采样时钟窗口
-  //
-  // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  //
-  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
-
-  //
-  // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  //
-  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
-  AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
-
-  //
-  // set SOC2 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  //
-  AdcRegs.ADCSOC2CTL.bit.ACQPS  = 6;
-  EDIS;
+  initTimer();
 
   for(;;)
   {
     __asm("          NOP");
   }
 
+}
+
+void initPWM()
+{
+    /*--------------------- for epwm1 initialization ------------------------*/
+      //
+      // Interrupts that are used in this example are re-mapped to
+      // ISR functions found within this file.
+      //
+      EALLOW;            // This is needed to write to EALLOW protected registers
+      PieVectTable.EPWM1_INT = &epwm1_isr;
+      EDIS;      // This is needed to disable write to EALLOW protected registers
+
+      //
+      // Step 4. Initialize all the Device Peripherals:
+      // Not required for this example
+      //
+      EALLOW;
+      SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 0;
+      EDIS;
+
+      InitEPwm1Example();
+
+      EALLOW;
+      SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;
+      EDIS;
+
+      //
+      // Step 5. User specific code, enable interrupts
+      // Initialize counters
+      //
+      EPwm1TimerIntCount = 0;
+
+      //
+      // Enable CPU INT3 which is connected to EPWM1-3 INT
+      //
+      IER |= M_INT3;
+
+      //
+      // Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
+      //
+      PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
+}
+
+void initTimer()
+{
+    /*--------------------- for timers initialization ------------------------*/
+
+    //
+    // Interrupts that are used in this example are re-mapped to
+    // ISR functions found within this file.
+    //
+    EALLOW;            // This is needed to write to EALLOW protected registers
+    PieVectTable.TINT0 = &cpu_timer0_isr;
+    PieVectTable.TINT1 = &cpu_timer1_isr;
+    PieVectTable.TINT2 = &cpu_timer2_isr;
+    EDIS;      // This is needed to disable write to EALLOW protected registers
+
+    //
+    // Step 4. Initialize the Device Peripheral. This function can be
+    //         found in f2802x_CpuTimers.c
+    //
+    InitCpuTimers();        // For this example, only initialize the Cpu Timers
+
+    //
+    // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
+    // 60MHz CPU Freq, 1 second Period (in uSeconds)
+    //
+    ConfigCpuTimer(&CpuTimer0, 60, 5000);
+    ConfigCpuTimer(&CpuTimer1, 60, 10000000);
+    ConfigCpuTimer(&CpuTimer2, 60, 10000);
+
+    //
+    // To ensure precise timing, use write-only instructions to write to the
+    // entire register. Therefore, if any of the configuration bits are changed
+    // in ConfigCpuTimer and InitCpuTimers (in f2802x_CpuTimers.h), the
+    // below settings must also be updated.
+    //
+    CpuTimer0Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
+    CpuTimer1Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
+    CpuTimer2Regs.TCR.all = 0x4001; //write-only instruction to set TSS bit = 0
+
+    //
+    // Enable CPU int1 which is connected to CPU-Timer 0, CPU int13
+    // which is connected to CPU-Timer 1, and CPU int 14, which is connected
+    // to CPU-Timer 2:
+    //
+    IER |= M_INT1;
+    IER |= M_INT13;
+    IER |= M_INT14;
+
+    //
+    // Enable TINT0 in the PIE: Group 1 interrupt 7
+    //
+    PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
+
+    //
+    // Enable global Interrupts and higher priority real-time debug events
+    //
+    EINT;               // Enable Global interrupt INTM
+    ERTM;               // Enable Global realtime interrupt DBGM
+}
+
+void initMyAdc()
+{
+    /*--------------------- for ADC initialization ------------------------*/
+
+      //
+      // Interrupts that are used in this example are re-mapped to
+      // ISR functions found within this file.
+      //
+      EALLOW;             // This is needed to write to EALLOW protected register
+      PieVectTable.ADCINT1 = &adc1_isr;
+      PieVectTable.ADCINT2 = &adc2_isr;
+      EDIS;      // This is needed to disable write to EALLOW protected registers
+
+      //
+      // Step 4. Initialize all the Device Peripherals
+      //
+      InitAdc();  // For this example, init the ADC
+      //AdcOffsetSelfCal();
+
+      // 使能ADCINT1为INT1.1
+      //
+      // Step 5. User specific code, enable interrupts:
+      // Enable ADCINT1 in PIE
+      //
+      PieCtrlRegs.PIEIER1.bit.INTx1 = 1; // Enable INT 1.1 in the PIE
+      PieCtrlRegs.PIEIER1.bit.INTx2 = 1; // Enable INT 1.2 in the PIE
+      IER |= M_INT1;                     // Enable CPU Interrupt 1
+      EINT;                              // Enable Global interrupt INTM
+      ERTM;                              // Enable Global realtime interrupt DBGM
+
+      LoopCount = 0;
+      ConversionCount = 0;
+
+      //
+      // Configure ADC
+      // Note: Channel ADCINA4  will be double sampled to workaround the ADC 1st
+      // sample issue for rev0 silicon errata
+      //
+      EALLOW;
+
+      // 设定ADC采样完成后触发中断，且需用户手动CLEAR FLAG后才能再次触发中断(non-continus mode)
+      //
+      // ADCINT1 trips after AdcResults latch
+      //
+      AdcRegs.ADCCTL1.bit.INTPULSEPOS = 1;
+
+      AdcRegs.INTSEL1N2.bit.INT1E     = 1;    // Enabled ADCINT1
+      AdcRegs.INTSEL1N2.bit.INT1CONT  = 0;    // Disable ADCINT1 Continuous mode
+
+      AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
+      AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
+
+      // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
+      //
+      // setup EOC2 to trigger ADCINT1 to fire
+      //
+      AdcRegs.INTSEL1N2.bit.INT1SEL   = 2;
+      AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
+
+      // 设定 SOC 的采样源引脚
+      //
+      // set SOC0 channel select to ADCINA4
+      //
+      AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
+
+      //
+      // set SOC1 channel select to ADCINA4
+      //
+      AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
+
+      //
+      // set SOC1 channel select to ADCINA2
+      //
+      AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
+
+      // 设置为 EOC 采样的触发条件，5为epwm1 soca
+      // 现在我想要全手动软件控制，即为 0 ， software only.
+      //
+      // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
+      // then SOC1
+      //
+      AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 2;
+
+      //
+      // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
+      // then SOC1
+      //
+      AdcRegs.ADCSOC1CTL.bit.TRIGSEL  = 1;
+
+      //
+      // set SOC2 start trigger on EPWM1A, due to round-robin SOC0 converts first
+      // then SOC1, then SOC2
+      //
+      AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 1;
+
+      // 设置采样时钟窗口
+      //
+      // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
+      //
+      AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
+
+      //
+      // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
+      //
+      AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
+      AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
+
+      //
+      // set SOC2 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
+      //
+      AdcRegs.ADCSOC2CTL.bit.ACQPS  = 6;
+      EDIS;
 }
 
 //
@@ -538,7 +554,7 @@ __interrupt void epwm1_isr(void)
 //
 void InitEPwm1Example()
 {
-  EPwm1Regs.TBPRD = 300;                        // Set timer period
+  EPwm1Regs.TBPRD = EPWN1_PRD;                   // Set timer period
   EPwm1Regs.TBPHS.half.TBPHS = 0x0000;           // Phase is 0
   EPwm1Regs.TBCTR = 0x0000;                      // Clear counter
 
@@ -558,7 +574,7 @@ void InitEPwm1Example()
   //
   // Setup compare
   //
-  EPwm1Regs.CMPA.half.CMPA = 1;
+  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-1;
 
   //
   // Set actions
@@ -590,19 +606,21 @@ void InitEPwm1Example()
 //
 // adc_isr -
 //
+float vol_slope = 2.96;
+float current_slope = 1.81;
 __interrupt void adc1_isr(void)
 {
   //
   // discard ADCRESULT0 as part of the workaround to the 1st sample errata
   // for rev0
   //
-  Voltage1[ConversionCount] = AdcResult.ADCRESULT1*VOL_SLOPE;
-  Voltage2[ConversionCount] = AdcResult.ADCRESULT2*CURRENT_SLOPE;
+  Voltage1[ConversionCount] = (AdcResult.ADCRESULT1/4096.0)*3.3*vol_slope;
+  Voltage2[ConversionCount] = (AdcResult.ADCRESULT2/4096.0)*3.3*current_slope;
 
   //
   // If 20 conversions have been logged, start over
   //
-  if(ConversionCount == 9)
+  if(ConversionCount == 4)
   {
     ConversionCount = 0;
   }
@@ -624,10 +642,24 @@ __interrupt void adc1_isr(void)
   return;
 }
 
+float adc0_result_int;
 __interrupt void adc2_isr(void)
 {
-  Voltage0[ConversionCount] = (AdcResult.ADCRESULT0/4096.0)*3.3;
+  adc0_result_int = (int)((AdcResult.ADCRESULT0/4096.0)*EPWN1_PRD);
 
+  EPwm1Regs.CMPA.half.CMPA = adc0_result_int;
+
+  //
+  // Clear ADCINT1 flag reinitialize for next SOC
+  //
+  AdcRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
+
+  //
+  // Acknowledge interrupt to PIE
+  //
+  PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+
+  return;
 }
 //
 // cpu_timer0_isr -
