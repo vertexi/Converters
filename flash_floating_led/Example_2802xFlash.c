@@ -151,6 +151,7 @@
 //#pragma CODE_SECTION(AdcChanSelect, "ramfuncs");
 //#pragma CODE_SECTION(AdcConversion, "ramfuncs");
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
+#pragma CODE_SECTION(get_PI_signal, "ramfuncs");
 //#pragma CODE_SECTION(adc2_isr, "ramfuncs");
 
 //
@@ -218,6 +219,7 @@ float Voltage2[sample_size];
 void initPWM();
 void initTimer();
 void initMyAdc();
+void get_PI_signal();
 
 float target_vol = 5;
 float adc_vol = 0;
@@ -277,13 +279,15 @@ void main(void)
   //
   InitPieVectTable();
 
-  initMyAdc();
-
   InitEPwm1Gpio();
 
   initPWM();
 
   initTimer();
+
+  DELAY_US(3000000);
+
+  initMyAdc();
 
   for(;;)
   {
@@ -716,28 +720,41 @@ __interrupt void cpu_timer2_isr(void)
   EDIS;
 }
 
-int error_index = 0;
-float error_list[3] = {0,0,0};
 float T_sam = 0.005;
-float P_arg = 1;
-float I_arg = 1;
-int I_en = 1;
+float P_arg = 20;
+float I_arg = 40;
+
 
 void get_PI_signal()
 {
-    error_list[1] = target_vol - adc_vol;
+    // error_list[1]  current error
+    // error_lsit[0]  last error
+    // error_list[2]  last PI signal
+    static int I_en = 1;
+    static int first_flag = 0;
+    static float error_list[3] = {1,1,1};
 
     float P_error = 0;
     float I_error = 0;
+    first_flag++;
+
+    error_list[1] = target_vol - adc_vol;
     P_error = P_arg*(error_list[1] - error_list[0]);
-    I_error = I_en*I_arg*(T_sam*error_list[1]);
-    error_list[2] = error_list[2] + P_error + I_error;
+    I_error = I_arg*(T_sam*error_list[1]);
+    error_list[2] = error_list[2] + P_error + I_en*I_error;
 
     error_list[0] = error_list[1];
 
     if (error_list[2] > 96)
     {
-        error_list[2] = 96;
+        if (first_flag < 50)
+        {
+            error_list[2] = 1;
+            first_flag = 55;
+        } else
+        {
+            error_list[2] = 96;
+        }
     } else if (error_list[2] < 0)
     {
         error_list[2] = 0;
