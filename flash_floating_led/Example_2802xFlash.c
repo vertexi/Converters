@@ -209,20 +209,27 @@ void Adc_Config(void);
 //
 uint16_t LoopCount;
 uint16_t ConversionCount;
-#define sample_size 5
-float Voltage1[sample_size];
-float Voltage2[sample_size];
+#define sample_size 8
+#define SAMPLE_MEAN_SHIFT 3
+uint16_t Voltage1[sample_size] = {0};
+uint16_t Voltage2[sample_size] = {0};
 
-#define VOL_SLOPE 0.00238342
-#define CURRENT_SLOPE 0.0014641868
+float vol_slope = 2.96;
+float current_slope = 1.81;
 
 void initPWM();
 void initTimer();
 void initMyAdc();
 void get_PI_signal();
+uint16_t pre_storage_adc(void);
 
 float target_vol = 5;
 float adc_vol = 0;
+
+#define ADC_PERIOD 100
+float T_sam = 0.000100;
+float P_arg = 40;
+float I_arg = 60;
 //
 // Main
 //
@@ -234,7 +241,12 @@ void main(void)
   // call to memcpy first, the processor will go "into the weeds"
   //
   memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
-
+  int i;
+  for (i = 0; i < sample_size; i++)
+  {
+    Voltage1[i] = 0;
+    Voltage2[i] = 0;
+  }
   //
   // Step 1. Initialize System Control:
   // PLL, WatchDog, enable Peripheral Clocks
@@ -362,7 +374,7 @@ void initTimer()
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
   //
-  ConfigCpuTimer(&CpuTimer0, 60, 5000);
+  ConfigCpuTimer(&CpuTimer0, 60, ADC_PERIOD);
   ConfigCpuTimer(&CpuTimer1, 60, 10000000);
   ConfigCpuTimer(&CpuTimer2, 60, 10000);
 
@@ -446,8 +458,8 @@ void initMyAdc()
   AdcRegs.INTSEL1N2.bit.INT1E     = 1;    // Enabled ADCINT1
   AdcRegs.INTSEL1N2.bit.INT1CONT  = 0;    // Disable ADCINT1 Continuous mode
 
-//     AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
-//     AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
+  //     AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
+  //     AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
 
   // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
   //
@@ -613,47 +625,30 @@ void InitEPwm1Example()
 //
 // adc_isr -
 //
-float vol_slope = 2.96;
-float current_slope = 1.81;
+uint16_t pre_storage_adc(void)
+{
+  uint16_t pre_value = 0;
+  pre_value = Voltage1[ConversionCount];
+  Voltage1[ConversionCount] = AdcResult.ADCRESULT1;
+  Voltage2[ConversionCount] = AdcResult.ADCRESULT2;
+
+  (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
+  return pre_value;
+}
+
 __interrupt void adc1_isr(void)
 {
-  //
-  // discard ADCRESULT0 as part of the workaround to the 1st sample errata
-  // for rev0
-  //
-  Voltage1[ConversionCount] = (AdcResult.ADCRESULT1/4096.0)*3.3*vol_slope;
-  Voltage2[ConversionCount] = (AdcResult.ADCRESULT2/4096.0)*3.3*current_slope;
+  static int32_t adc_sum = 0;
+  adc_sum -= pre_storage_adc();
+  adc_sum += AdcResult.ADCRESULT1;
 
-  adc_vol = 0;
-  int i;
-  for(i = 0; i < sample_size; i++)
-  {
-      adc_vol += Voltage1[i];
-  }
-  adc_vol = adc_vol/sample_size;
-
+  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0))*3.3;
   get_PI_signal();
 
-  //
-  // If 20 conversions have been logged, start over
-  //
-  if(ConversionCount == sample_size-1)
-  {
-    ConversionCount = 0;
-  }
-  else
-  {
-    ConversionCount++;
-  }
-
-  //
   // Clear ADCINT1 flag reinitialize for next SOC
-  //
   AdcRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
 
-  //
   // Acknowledge interrupt to PIE
-  //
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
   return;
@@ -720,59 +715,58 @@ __interrupt void cpu_timer2_isr(void)
   EDIS;
 }
 
-float T_sam = 0.005;
-float P_arg = 20;
-float I_arg = 40;
-
 
 void get_PI_signal()
 {
-    // error_list[1]  current error
-    // error_lsit[0]  last error
-    // error_list[2]  last PI signal
-    static int I_en = 1;
-    static int first_flag = 0;
-    static float error_list[3] = {1,1,1};
+  // error_list[1]  current error
+  // error_lsit[0]  last error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+  static float error_list[3] = {1,1,1};
 
-    float P_error = 0;
-    float I_error = 0;
+  float P_error = 0;
+  float I_error = 0;
+  if (first_flag < 50)
+  {
     first_flag++;
+  }
 
-    error_list[1] = target_vol - adc_vol;
-    P_error = P_arg*(error_list[1] - error_list[0]);
-    I_error = I_arg*(T_sam*error_list[1]);
-    error_list[2] = error_list[2] + P_error + I_en*I_error;
+  error_list[1] = target_vol - adc_vol;
+  P_error = P_arg*(error_list[1] - error_list[0]);
+  I_error = I_arg*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error + I_en*I_error;
 
-    error_list[0] = error_list[1];
+  error_list[0] = error_list[1];
 
-    if (error_list[2] > 96)
+  if (error_list[2] > 96)
+  {
+    if (first_flag < 50)
     {
-        if (first_flag < 50)
-        {
-            error_list[2] = 1;
-            first_flag = 55;
-        } else
-        {
-            error_list[2] = 96;
-        }
-    } else if (error_list[2] < 0)
+      error_list[2] = 1;
+      first_flag = 55;
+    } else
     {
-        error_list[2] = 0;
+      error_list[2] = 96;
     }
+  } else if (error_list[2] < 0)
+  {
+    error_list[2] = 0;
+  }
 
-    EPwm1Regs.CMPA.half.CMPA = 300-error_list[2]/100*300;
+  EPwm1Regs.CMPA.half.CMPA = 300-error_list[2]/100*300;
 
-    if (error_list[2] > 96 && error_list[1] > 0)
-    {
-        I_en = 0;
-        return;
-    }
-    if (error_list[2] < 0 && error_list[1] < 0)
-    {
-        I_en = 0;
-        return;
-    }
-
-    I_en = 1;
+  if (error_list[2] > 96 && error_list[1] > 0)
+  {
+    I_en = 0;
     return;
+  }
+  if (error_list[2] < 0 && error_list[1] < 0)
+  {
+    I_en = 0;
+    return;
+  }
+
+  I_en = 1;
+  return;
 }
