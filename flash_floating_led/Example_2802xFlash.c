@@ -209,18 +209,19 @@ void Adc_Config(void);
 //
 uint16_t LoopCount;
 uint16_t ConversionCount;
-#define sample_size 8
+#define sample_size 16
 #define SAMPLE_MEAN_SHIFT 3
 uint16_t Voltage1[sample_size] = {0};
-uint16_t Voltage2[sample_size] = {0};
+uint16_t Voltage2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
-#define vol_slope 3.15278387884112;
+#define vol_slope 3.15278;
 float current_slope = 1.81;
 float ADC_ADJ = 0.06;
 
 void initPWM();
 void initTimer();
 void initMyAdc();
+float error_list[3] = {1,1,1};
 void get_PI_signal();
 uint16_t pre_storage_adc(void);
 
@@ -229,8 +230,8 @@ float adc_vol = 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
-float P_arg = 5;
-float I_arg = 10;
+float P_arg = 10;
+float I_arg = 100;
 //
 // Main
 //
@@ -298,7 +299,9 @@ void main(void)
 
   initTimer();
 
-  DELAY_US(3000000);
+  error_list[2] = 30;
+
+  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-error_list[2]/100*EPWN1_PRD;
 
   initMyAdc();
 
@@ -724,7 +727,6 @@ void get_PI_signal()
   // error_list[2]  last PI signal
   static int I_en = 1;
   static int first_flag = 0;
-  static float error_list[3] = {1,1,1};
 
   float P_error = 0;
   float I_error = 0;
