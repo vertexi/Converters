@@ -216,6 +216,7 @@ uint16_t Voltage2[sample_size] = {0};
 
 float vol_slope = 2.96;
 float current_slope = 1.81;
+#define ADC_ADJ 0.25
 
 void initPWM();
 void initTimer();
@@ -642,7 +643,7 @@ __interrupt void adc1_isr(void)
   adc_sum -= pre_storage_adc();
   adc_sum += AdcResult.ADCRESULT1;
 
-  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0))*3.3;
+  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0))*3.3 + ADC_ADJ;
   get_PI_signal();
 
   // Clear ADCINT1 flag reinitialize for next SOC
