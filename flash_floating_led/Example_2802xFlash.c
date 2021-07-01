@@ -214,9 +214,9 @@ uint16_t ConversionCount;
 uint16_t Voltage1[sample_size] = {0};
 uint16_t Voltage2[sample_size] = {0};
 
-float vol_slope = 2.96;
+#define vol_slope 3.15278387884112;
 float current_slope = 1.81;
-#define ADC_ADJ 0.25
+float ADC_ADJ = 0.06;
 
 void initPWM();
 void initTimer();
@@ -224,13 +224,13 @@ void initMyAdc();
 void get_PI_signal();
 uint16_t pre_storage_adc(void);
 
-float target_vol = 5;
+float target_vol = 8;
 float adc_vol = 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
-float P_arg = 40;
-float I_arg = 60;
+float P_arg = 5;
+float I_arg = 10;
 //
 // Main
 //
@@ -643,7 +643,7 @@ __interrupt void adc1_isr(void)
   adc_sum -= pre_storage_adc();
   adc_sum += AdcResult.ADCRESULT1;
 
-  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0))*3.3 + ADC_ADJ;
+  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0)+ADC_ADJ)*3.3*vol_slope;
   get_PI_signal();
 
   // Clear ADCINT1 flag reinitialize for next SOC
@@ -755,7 +755,7 @@ void get_PI_signal()
     error_list[2] = 0;
   }
 
-  EPwm1Regs.CMPA.half.CMPA = 300-error_list[2]/100*300;
+  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-error_list[2]/100*EPWN1_PRD;
 
   if (error_list[2] > 96 && error_list[1] > 0)
   {
