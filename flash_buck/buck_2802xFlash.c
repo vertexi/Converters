@@ -9,9 +9,6 @@
 // the linker cmd file.
 //
 #pragma CODE_SECTION(epwm1_isr, "ramfuncs");
-//#pragma CODE_SECTION(AdcOffsetSelfCal, "ramfuncs");
-//#pragma CODE_SECTION(AdcChanSelect, "ramfuncs");
-//#pragma CODE_SECTION(AdcConversion, "ramfuncs");
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal, "ramfuncs");
 //#pragma CODE_SECTION(adc2_isr, "ramfuncs");
@@ -76,24 +73,27 @@ uint16_t ConversionCount;
 uint16_t Voltage1[sample_size] = {0};
 uint16_t Voltage2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
-#define vol_slope 3.15278;
+#define my_vol_slope 3.15278;
+#define vol_slope 2.9529;
 float current_slope = 1.81;
-float ADC_ADJ = 0.06;
+float ADC_ADJ = 0;
 
 void initPWM();
 void initTimer();
 void initMyAdc();
 float error_list[3] = {1,1,1};
+#define INIT_DUTY 40;
 void get_PI_signal();
 uint16_t pre_storage_adc(void);
 
-float target_vol = 8;
+float target_vol = 5;
+#define TARGET_ADJ -0.3;
 float adc_vol = 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
 float P_arg = 10;
-float I_arg = 100;
+float I_arg = 120;
 //
 // Main
 //
@@ -111,6 +111,8 @@ void main(void)
     Voltage1[i] = 0;
     Voltage2[i] = 0;
   }
+  target_vol += TARGET_ADJ;
+  error_list[2] = INIT_DUTY;
   //
   // Step 1. Initialize System Control:
   // PLL, WatchDog, enable Peripheral Clocks
@@ -160,10 +162,6 @@ void main(void)
   initPWM();
 
   initTimer();
-
-  error_list[2] = 30;
-
-  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-error_list[2]/100*EPWN1_PRD;
 
   initMyAdc();
 
@@ -459,7 +457,7 @@ void InitEPwm1Example()
   //
   // Setup compare
   //
-  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-1;
+  EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-error_list[2]/100*EPWN1_PRD;
 
   //
   // Set actions
