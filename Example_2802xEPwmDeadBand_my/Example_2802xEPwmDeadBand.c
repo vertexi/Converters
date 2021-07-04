@@ -31,21 +31,21 @@
 //    peripheral boot modes are as follows:
 //
 //      Boot Mode:   EMU_KEY        EMU_BMODE
-//                   (0xD00)	     (0xD01)
+//                   (0xD00)         (0xD01)
 //      ---------------------------------------
-//      Wait		 !=0x55AA        X
-//      I/O		     0x55AA	         0x0000
-//      SCI		     0x55AA	         0x0001
-//      Wait 	     0x55AA	         0x0002
-//      Get_Mode	 0x55AA	         0x0003
-//      SPI		     0x55AA	         0x0004
-//      I2C		     0x55AA	         0x0005
-//      OTP		     0x55AA	         0x0006
-//      Wait		 0x55AA	         0x0007
-//      Wait		 0x55AA	         0x0008
-//      SARAM		 0x55AA	         0x000A	  <-- "Boot to SARAM"
-//      Flash		 0x55AA	         0x000B
-//	    Wait		 0x55AA          Other
+//      Wait         !=0x55AA        X
+//      I/O          0x55AA          0x0000
+//      SCI          0x55AA          0x0001
+//      Wait         0x55AA          0x0002
+//      Get_Mode     0x55AA          0x0003
+//      SPI          0x55AA          0x0004
+//      I2C          0x55AA          0x0005
+//      OTP          0x55AA          0x0006
+//      Wait         0x55AA          0x0007
+//      Wait         0x55AA          0x0008
+//      SARAM        0x55AA          0x000A   <-- "Boot to SARAM"
+//      Flash        0x55AA          0x000B
+//      Wait         0x55AA          Other
 //
 //   Write EMU_KEY to 0xD00 and EMU_BMODE to 0xD01 via the debugger
 //   according to the Boot Mode Table above. Build/Load project,
@@ -141,7 +141,7 @@ uint16_t  EPwm3_DB_Direction;
 #define EPWM2_MAX_DB   0x03FF
 #define EPWM3_MAX_DB   0x03FF
 
-#define EPWM1_MIN_DB   0
+#define EPWM1_MIN_DB   0x0100
 #define EPWM2_MIN_DB   0
 #define EPWM3_MIN_DB   0
 
@@ -184,8 +184,6 @@ void main(void)
     // These functions are in the f2802x_EPwm.c file
     //
     InitEPwm1Gpio();
-    InitEPwm2Gpio();
-    InitEPwm3Gpio();
 
     //
     // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -223,8 +221,6 @@ void main(void)
     //
     EALLOW;            // This is needed to write to EALLOW protected registers
     PieVectTable.EPWM1_INT = &epwm1_isr;
-    PieVectTable.EPWM2_INT = &epwm2_isr;
-    PieVectTable.EPWM3_INT = &epwm3_isr;
     EDIS;      // This is needed to disable write to EALLOW protected registers
 
     //
@@ -235,9 +231,8 @@ void main(void)
     SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 0;
     EDIS;
 
+    EPwm1Regs.DBFED = 0x0200;
     InitEPwm1Example();
-    InitEPwm2Example();
-    InitEPwm3Example();
 
     EALLOW;
     SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -248,8 +243,6 @@ void main(void)
     // Initialize counters
     //
     EPwm1TimerIntCount = 0;
-    EPwm2TimerIntCount = 0;
-    EPwm3TimerIntCount = 0;
 
     //
     // Enable CPU INT3 which is connected to EPWM1-3 INT
@@ -260,8 +253,6 @@ void main(void)
     // Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
     //
     PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
-    PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
-    PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
 
     //
     // Enable global Interrupts and higher priority real-time debug events
@@ -284,34 +275,34 @@ void main(void)
 __interrupt void
 epwm1_isr(void)
 {
-    if(EPwm1_DB_Direction == DB_UP)
-    {
-        if(EPwm1Regs.DBFED < EPWM1_MAX_DB)
-        {
-            EPwm1Regs.DBFED++;
-            EPwm1Regs.DBRED++;
-        }
-        else
-        {
-            EPwm1_DB_Direction = DB_DOWN;
-            EPwm1Regs.DBFED--;
-            EPwm1Regs.DBRED--;
-        }
-    }
-    else
-    {
-        if(EPwm1Regs.DBFED == EPWM1_MIN_DB)
-        {
-            EPwm1_DB_Direction = DB_UP;
-            EPwm1Regs.DBFED++;
-            EPwm1Regs.DBRED++;
-        }
-        else
-        {
-            EPwm1Regs.DBFED--;
-            EPwm1Regs.DBRED--;
-        }
-    }
+//    if(EPwm1_DB_Direction == DB_UP)
+//    {
+//        if(EPwm1Regs.DBFED < EPWM1_MAX_DB)
+//        {
+//            EPwm1Regs.DBFED++;
+//            EPwm1Regs.DBRED++;
+//        }
+//        else
+//        {
+//            EPwm1_DB_Direction = DB_DOWN;
+//            EPwm1Regs.DBFED--;
+//            EPwm1Regs.DBRED--;
+//        }
+//    }
+//    else
+//    {
+//        if(EPwm1Regs.DBFED == EPWM1_MIN_DB)
+//        {
+//            EPwm1_DB_Direction = DB_UP;
+//            EPwm1Regs.DBFED++;
+//            EPwm1Regs.DBRED++;
+//        }
+//        else
+//        {
+//            EPwm1Regs.DBFED--;
+//            EPwm1Regs.DBRED--;
+//        }
+//    }
     EPwm1TimerIntCount++;
 
     //
@@ -427,7 +418,7 @@ epwm3_isr(void)
 void
 InitEPwm1Example()
 {
-    EPwm1Regs.TBPRD = 6000;                        // Set timer period
+    EPwm1Regs.TBPRD = 600;                        // Set timer period
     EPwm1Regs.TBPHS.half.TBPHS = 0x0000;           // Phase is 0
     EPwm1Regs.TBCTR = 0x0000;                      // Clear counter
 
@@ -436,8 +427,8 @@ InitEPwm1Example()
     //
     EPwm1Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
     EPwm1Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm1Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
-    EPwm1Regs.TBCTL.bit.CLKDIV = TB_DIV4;
+    EPwm1Regs.TBCTL.bit.HSPCLKDIV = TB_DIV2;       // Clock ratio to SYSCLKOUT
+    EPwm1Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
     EPwm1Regs.CMPCTL.bit.SHDWAMODE = CC_SHADOW;    // Load registers every ZERO
     EPwm1Regs.CMPCTL.bit.SHDWBMODE = CC_SHADOW;
@@ -447,7 +438,7 @@ InitEPwm1Example()
     //
     // Setup compare
     //
-    EPwm1Regs.CMPA.half.CMPA = 3000;
+    EPwm1Regs.CMPA.half.CMPA = 300;
 
     //
     // Set actions
@@ -455,14 +446,14 @@ InitEPwm1Example()
     EPwm1Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
     EPwm1Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 
-    EPwm1Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM1A on Zero
-    EPwm1Regs.AQCTLB.bit.CAD = AQ_SET;
+    EPwm1Regs.AQCTLB.bit.CAU = AQ_SET;          // Set PWM1A on Zero
+    EPwm1Regs.AQCTLB.bit.CAD = AQ_CLEAR;
 
     //
     // Active Low PWMs - Setup Deadband
     //
     EPwm1Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm1Regs.DBCTL.bit.POLSEL = DB_ACTV_LO;
+    EPwm1Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
     EPwm1Regs.DBCTL.bit.IN_MODE = DBA_ALL;
     EPwm1Regs.DBRED = EPWM1_MIN_DB;
     EPwm1Regs.DBFED = EPWM1_MIN_DB;
