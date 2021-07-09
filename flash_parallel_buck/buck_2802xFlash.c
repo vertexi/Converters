@@ -10,8 +10,9 @@
 //
 #pragma CODE_SECTION(epwm1_isr, "ramfuncs");
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
+#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
-#pragma CODE_SECTION(get_PI_signal2, "ramfuncs");
+#pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc1, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc2, "ramfuncs");
 //#pragma CODE_SECTION(adc2_isr, "ramfuncs");
@@ -75,46 +76,60 @@ void Adc_Config(void);
 uint16_t LoopCount;
 uint16_t ConversionCount;
 #define sample_size 16
+uint16_t ADC0[sample_size] = {0};
 uint16_t ADC1[sample_size] = {0};
 uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
-
 
 
 void initPWM();
 void initTimer();
 void initMyAdc();
+void get_PI_signal0(float *error_list);
 void get_PI_signal1(float *error_list);
-void get_PI_signal2(float *error_list);
+int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
 int32_t pre_storage_adc2(void);
 
-#define INIT_DUTY1 30;
-#define INIT_DUTY2 50;
-float error_list1[3] = {1,1,1};
-float error_list2[3] = {1,1,1};
+float INIT_DUTY0 = 20; // for pwm1
+float INIT_DUTY1 = 20; // for pwm2
+#define INIT_PI0 20; // for pwm1+pwm2
+#define INIT_PI1 1; // for pwm1/pwm2
+float error_list0[3] = {1,1,1};
+float error_list1[3] = {0,0,0};
 
-float slope1 = 0.8967;
-float intercept1 = -0.14471; //current1
-float slope2 = 0.750788;
-float intercept2 = -0.02822; //current2
+float ADC0_slope = 1.0575;
+float ADC0_intercept = 0.0208;
 float ADC1_slope = 1.0575;
 float ADC1_intercept = 0.0208;
 float ADC2_slope = 1.0575;
 float ADC2_intercept = 0.0408;
+float ADC0_ADJ = 0;
 float ADC1_ADJ = 0;
 float ADC2_ADJ = 0.0;
-float adc_value1 = 0;
-float adc_value2 = 0;
 
-float target_1 = 0.5;
-float target_2 = 0.7;
-#define TARGET_1_ADJ 0;
-#define TARGET_2_ADJ 0;
+float slope0 = 3.15278;
+float intercept0 = 0;        //valtage1
+float slope1 = 0.8967;
+float intercept1 = -0.14471; //current1
+float slope2 = 0.750788;
+float intercept2 = -0.02822; //current2
+
+float adc_value0 = 0;// voltage1
+float adc_value1 = 0;// current1
+float adc_value2 = 0;// current2
+float adc_value3 = 0;// current1/current2
+
+float target_0 = 8; // expect value for valtage
+float target_k = 1.5; // current 1/ current 2
+#define TARGET_0_ADJ 0;
+#define TARGET_k_ADJ 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
-float P_arg = 50;
-float I_arg = 20;
+float P_arg0 = 50;
+float I_arg0 = 100;
+float P_arg1 = 50;
+float I_arg1 = 20;
 //
 // Main
 //
@@ -129,13 +144,15 @@ void main(void)
   int i;
   for (i = 0; i < sample_size; i++)
   {
+    ADC0[i] = 0;
     ADC1[i] = 0;
     ADC2[i] = 0;
   }
-  target_1 += TARGET_1_ADJ;
-  target_2 += TARGET_2_ADJ;
-  error_list1[2] = INIT_DUTY1;
-  error_list2[2] = INIT_DUTY2;
+  target_0 += TARGET_0_ADJ;
+  target_k += TARGET_k_ADJ;
+
+  error_list0[2] = INIT_PI0;
+  error_list1[2] = INIT_PI1;
   //
   // Step 1. Initialize System Control:
   // PLL, WatchDog, enable Peripheral Clocks
@@ -358,28 +375,18 @@ void initMyAdc()
   //    AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
 
   // 设定 SOC 的采样源引脚
-  //
-  // set SOC0 channel select to ADCINA4
-  //
-  //     AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
-
-  //
-  // set SOC1 channel select to ADCINA4
-  //
+  // set SOC0 channel select to ADCINA6
+  AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
   AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
-
-  //
-  // set SOC1 channel select to ADCINA2
-  //
   AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
 
-  // 设置为 EOC 采样的触发条件，5为epwm1 soca
+  // 设置为 EOC 采样的触发条件，5为epwm1 soca, 1为 timer0
   // 现在我想要全手动软件控制，即为 0 ， software only.
   //
   // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
   // then SOC1
   //
-  //      AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 2;
+  AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 1;
 
   //
   // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
@@ -397,16 +404,8 @@ void initMyAdc()
   //
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
-  //      AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
-
-  //
-  // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  //
+  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
   AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
-
-  //
-  // set SOC2 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  //
   AdcRegs.ADCSOC2CTL.bit.ACQPS  = 6;
   EDIS;
 }
@@ -450,7 +449,7 @@ void InitEPwm1Example()
   //
   // Setup compare
   //
-  EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-error_list1[2]/100*EPWM1_PRD;
+  EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-INIT_DUTY0/100*EPWM1_PRD;
 
   //
   // Set actions
@@ -504,7 +503,7 @@ void InitEPwm2Example()
   //
   // Setup compare
   //
-  EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-error_list2[2]/100*EPWM1_PRD;
+  EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-INIT_DUTY1/100*EPWM1_PRD;
 
   //
   // Set actions
@@ -526,10 +525,16 @@ void InitEPwm2Example()
   EPwm2_DB_Direction = DB_UP;
 }
 
+int32_t pre_storage_adc0(void)
+{
+  static int32_t adc_sum0 = 0;
+  adc_sum0 -= ADC0[ConversionCount];
+  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
+  adc_sum0 += AdcResult.ADCRESULT0;
+  return adc_sum0;
+}
 
-//
-// adc_isr -
-//
+
 int32_t pre_storage_adc1(void)
 {
   static int32_t adc_sum1 = 0;
@@ -539,9 +544,6 @@ int32_t pre_storage_adc1(void)
   return adc_sum1;
 }
 
-//
-// adc_isr -
-//
 int32_t pre_storage_adc2(void)
 {
   static int32_t adc_sum2 = 0;
@@ -551,17 +553,22 @@ int32_t pre_storage_adc2(void)
   return adc_sum2;
 }
 
+float adc_vol0 = 0;
 float adc_vol1 = 0;
 float adc_vol2 = 0;
 __interrupt void adc1_isr(void)
 {
+  adc_vol0 = ((double)pre_storage_adc0()/(double)(sample_size*4096.0))*3.3*ADC0_slope+ADC0_intercept;
+  adc_value0 = adc_vol0*slope0+intercept0;
   adc_vol1 = ((double)pre_storage_adc1()/(double)(sample_size*4096.0))*3.3*ADC1_slope+ADC1_intercept;
   adc_value1 = adc_vol1*slope1+intercept1;
   adc_vol2 = ((double)pre_storage_adc2()/(double)(sample_size*4096.0))*3.3*ADC2_slope+ADC2_intercept;
   adc_value2 = adc_vol2*slope2+intercept2;
 
+  adc_value3 = adc_value1 / adc_value2;
+
+  get_PI_signal0(error_list0);
   get_PI_signal1(error_list1);
-  get_PI_signal2(error_list2);
 
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
@@ -571,6 +578,152 @@ __interrupt void adc1_isr(void)
   // Acknowledge interrupt to PIE
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
+  return;
+}
+
+float P_error0 = 0;
+float I_error0 = 0;
+void get_PI_signal0(float *error_list)
+{
+  // error_list[1]  current error
+  // error_list[0]  last error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+
+  if (first_flag < 50)
+  {
+    first_flag++;
+  }
+
+  error_list[1] = target_0 - adc_value0;
+  P_error0 = P_arg0*(error_list[1] - error_list[0]);
+  I_error0 = I_en*I_arg0*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error0 + I_error0;
+
+  error_list[0] = error_list[1];
+
+  if (error_list[2] > 96*2 && error_list[1] > 0)
+  {
+    I_en = 0;
+  }else if (error_list[2] < 3 && error_list[1] < 0)
+  {
+    I_en = 0;
+  }else
+  {
+    I_en = 1;
+  }
+
+  if (error_list[2] > 96*2)
+  {
+    if (first_flag < 50)
+    {
+      error_list[2] = INIT_PI0;
+      first_flag = 55;
+    } else
+    {
+      error_list[2] = 96*2;
+    }
+  } else if (error_list[2] < 3)
+  {
+    error_list[2] = 3;
+  }
+
+  return;
+}
+
+float P_error1 = 0;
+float I_error1 = 0;
+float pwm1_f = 0;
+float pwm2_f = 0;
+void get_PI_signal1(float *error_list)
+{
+  // error_list[1]  current error
+  // error_list[0]  last error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+
+  error_list[1] = target_k - adc_value3;
+  P_error1 = P_arg1*(error_list[1] - error_list[0]);
+  I_error1 = I_en*I_arg1*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error1 + I_error1;
+
+  error_list[0] = error_list[1];
+
+  float pwm2 = 0, pwm1 = 0;
+  pwm2 = error_list0[2]/(1+error_list1[2]);
+  pwm1 = error_list1[2]*pwm2;
+
+  if ((error_list[2] > 10||(pwm1 > 96 || pwm2 < 3)) && error_list[1] > 0)
+  {
+    I_en = 0;
+  } else if ((error_list[2] < 0.1||(pwm2 > 96 || pwm1 < 3)) && error_list[1] < 0)
+  {
+    I_en = 0;
+  } else
+  {
+    I_en = 1;
+  }
+  if (first_flag < 50)
+  {
+    first_flag++;
+  }
+  if (error_list[2] > 10 || error_list[2] < 0.1)
+  {
+    if (first_flag < 50)
+    {
+      error_list[2] = INIT_PI1;
+      first_flag = 55;
+    }
+  }
+
+  if (error_list[2] > 10)
+  {
+      error_list[2] = 10;
+  } else if (error_list[2] < 0.1)
+  {
+    error_list[2] = 0.1;
+  }
+
+  if (pwm1 > 96 || pwm1 < 3)
+  {
+    if (first_flag < 50)
+    {
+      pwm1 = INIT_DUTY0;
+      first_flag = 55;
+    }
+  }
+  if (pwm2 > 96 || pwm2 < 3)
+  {
+      if (first_flag < 50)
+      {
+        pwm2 = INIT_DUTY1;
+        first_flag = 55;
+      }
+  }
+
+  if (pwm1 > 96)
+  {
+    pwm1 = 96;
+  }
+  if (pwm2 > 96)
+  {
+    pwm2 = 96;
+  }
+  if (pwm1 < 3)
+  {
+    pwm1 = 3;
+  }
+  if (pwm2 < 3)
+  {
+    pwm2 = 3;
+  }
+
+  pwm1_f = pwm1;
+  pwm2_f = pwm2;
+  EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-pwm1_f/100*EPWM1_PRD;
+  EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-pwm2_f/100*EPWM1_PRD;
   return;
 }
 
@@ -635,113 +788,3 @@ __interrupt void cpu_timer2_isr(void)
   EDIS;
 }
 
-float P_error1 = 0;
-float I_error1 = 0;
-
-void get_PI_signal1(float *error_list)
-{
-  // error_list[1]  current error
-  // error_list[0]  last error
-  // error_list[2]  last PI signal
-  static int I_en = 1;
-  static int first_flag = 0;
-
-  if (first_flag < 50)
-  {
-    first_flag++;
-  }
-
-  error_list[1] = target_1 - adc_value1;
-  P_error1 = P_arg*(error_list[1] - error_list[0]);
-  I_error1 = I_en*I_arg*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error1 + I_error1;
-
-  error_list[0] = error_list[1];
-
-  if (error_list[2] > 96)
-  {
-    if (first_flag < 50)
-    {
-      error_list[2] = 1;
-      first_flag = 55;
-    } else
-    {
-      error_list[2] = 96;
-    }
-  } else if (error_list[2] < 0)
-  {
-    error_list[2] = 0;
-  }
-
-  EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-error_list[2]/100*EPWM1_PRD;
-
-  if (error_list[2] > 96 && error_list[1] > 0)
-  {
-    I_en = 0;
-    return;
-  }
-  if (error_list[2] < 0 && error_list[1] < 0)
-  {
-    I_en = 0;
-    return;
-  }
-
-  I_en = 1;
-  return;
-}
-
-float P_error2 = 0;
-float I_error2 = 0;
-
-void get_PI_signal2(float *error_list)
-{
-  // error_list[1]  current error
-  // error_list[0]  last error
-  // error_list[2]  last PI signal
-  static int I_en = 1;
-  static int first_flag = 0;
-
-
-  if (first_flag < 50)
-  {
-    first_flag++;
-  }
-
-  error_list[1] = target_2 - adc_value2;
-  P_error2 = P_arg*(error_list[1] - error_list[0]);
-  I_error2 = I_en*I_arg*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error2 + I_error2;
-
-  error_list[0] = error_list[1];
-
-  if (error_list[2] > 96)
-  {
-    if (first_flag < 50)
-    {
-      error_list[2] = 1;
-      first_flag = 55;
-    } else
-    {
-      error_list[2] = 96;
-    }
-  } else if (error_list[2] < 0)
-  {
-    error_list[2] = 0;
-  }
-
-  EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-error_list[2]/100*EPWM1_PRD;
-
-  if (error_list[2] > 96 && error_list[1] > 0)
-  {
-    I_en = 0;
-    return;
-  }
-  if (error_list[2] < 0 && error_list[1] < 0)
-  {
-    I_en = 0;
-    return;
-  }
-
-  I_en = 1;
-  return;
-}
