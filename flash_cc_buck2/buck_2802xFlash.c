@@ -93,10 +93,10 @@ int32_t pre_storage_adc2(void);
 float error_list1[3] = {1,1,1};
 float error_list2[3] = {1,1,1};
 
-float slope1 = 0.9613;
-float intercept1 = -0.2979; //current1
-float slope2 = 0.9613;
-float intercept2 = -0.2979; //current2
+float slope1 = 0.8967;
+float intercept1 = -0.14471; //current1
+float slope2 = 0.750788;
+float intercept2 = -0.02822; //current2
 float ADC1_slope = 1.0575;
 float ADC1_intercept = 0.0208;
 float ADC2_slope = 1.0575;
@@ -106,15 +106,15 @@ float ADC2_ADJ = 0.0;
 float adc_value1 = 0;
 float adc_value2 = 0;
 
-float target_1 = 0.4;
+float target_1 = 0.1;
 float target_2 = 0.4;
 #define TARGET_1_ADJ 0;
 #define TARGET_2_ADJ 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
-float P_arg = 100;
-float I_arg = 5000;
+float P_arg = 50;
+float I_arg = 2000;
 //
 // Main
 //
@@ -559,6 +559,7 @@ __interrupt void adc1_isr(void)
   adc_value1 = adc_vol1*slope1+intercept1;
   adc_vol2 = ((double)pre_storage_adc2()/(double)(sample_size*4096.0))*3.3*ADC2_slope+ADC2_intercept;
   adc_value2 = adc_vol2*slope2+intercept2;
+
   get_PI_signal1(error_list1);
   get_PI_signal2(error_list2);
 
@@ -634,6 +635,8 @@ __interrupt void cpu_timer2_isr(void)
   EDIS;
 }
 
+float P_error1 = 0;
+float I_error1 = 0;
 
 void get_PI_signal1(float *error_list)
 {
@@ -643,17 +646,15 @@ void get_PI_signal1(float *error_list)
   static int I_en = 1;
   static int first_flag = 0;
 
-  float P_error = 0;
-  float I_error = 0;
   if (first_flag < 50)
   {
     first_flag++;
   }
 
   error_list[1] = target_1 - adc_value1;
-  P_error = P_arg*(error_list[1] - error_list[0]);
-  I_error = I_arg*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error + I_en*I_error;
+  P_error1 = P_arg*(error_list[1] - error_list[0]);
+  I_error1 = I_en*I_arg*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error1 + I_error1;
 
   error_list[0] = error_list[1];
 
