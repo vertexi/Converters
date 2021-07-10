@@ -105,15 +105,23 @@ float ADC2_ADJ = 0.0;
 volatile float adc_value1 = 0;
 volatile float adc_value2 = 0;
 
+<<<<<<< HEAD
+float target_1 = 0.5;
+float target_2 = 0.7;
+||||||| 68f9169
+float target_1 = 0.1;
+float target_2 = 0.4;
+=======
 float target_1 = 1.1;
 float target_2 = 0.7;
+>>>>>>> new_current_sensor
 #define TARGET_1_ADJ 0;
 #define TARGET_2_ADJ 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
 float P_arg = 50;
-float I_arg = 2000;
+float I_arg = 20;
 //
 // Main
 //
