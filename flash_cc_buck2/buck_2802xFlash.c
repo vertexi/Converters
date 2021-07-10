@@ -66,7 +66,6 @@ extern uint16_t RamfuncsRunStart;
 // Function Prototypes
 //
 __interrupt void adc1_isr(void);
-__interrupt void adc2_isr(void);
 void Adc_Config(void);
 
 //
@@ -103,11 +102,11 @@ float ADC2_slope = 1.0575;
 float ADC2_intercept = 0.0408;
 float ADC1_ADJ = 0;
 float ADC2_ADJ = 0.0;
-float adc_value1 = 0;
-float adc_value2 = 0;
+volatile float adc_value1 = 0;
+volatile float adc_value2 = 0;
 
-float target_1 = 0.1;
-float target_2 = 0.4;
+float target_1 = 1.1;
+float target_2 = 0.7;
 #define TARGET_1_ADJ 0;
 #define TARGET_2_ADJ 0;
 
@@ -532,7 +531,7 @@ void InitEPwm2Example()
 //
 int32_t pre_storage_adc1(void)
 {
-  static int32_t adc_sum1 = 0;
+  static volatile int32_t adc_sum1 = 0;
   adc_sum1 -= ADC1[ConversionCount];
   ADC1[ConversionCount] = AdcResult.ADCRESULT1;
   adc_sum1 += AdcResult.ADCRESULT1;
@@ -544,22 +543,24 @@ int32_t pre_storage_adc1(void)
 //
 int32_t pre_storage_adc2(void)
 {
-  static int32_t adc_sum2 = 0;
+  static volatile int32_t adc_sum2 = 0;
   adc_sum2 -= ADC2[ConversionCount];
   ADC2[ConversionCount] = AdcResult.ADCRESULT2;
   adc_sum2 += AdcResult.ADCRESULT2;
   return adc_sum2;
 }
 
-float adc_vol1 = 0;
-float adc_vol2 = 0;
+volatile float adc_vol1 = 0;
+volatile float adc_vol2 = 0;
 __interrupt void adc1_isr(void)
 {
   adc_vol1 = ((double)pre_storage_adc1()/(double)(sample_size*4096.0))*3.3*ADC1_slope+ADC1_intercept;
-  adc_value1 = adc_vol1*slope1+intercept1;
+  adc_value1 = adc_vol1;
   adc_vol2 = ((double)pre_storage_adc2()/(double)(sample_size*4096.0))*3.3*ADC2_slope+ADC2_intercept;
-  adc_value2 = adc_vol2*slope2+intercept2;
+  adc_value2 = adc_vol2;
 
+  //EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-(adc_value1/3.3)*EPWM1_PRD;
+  //EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-(adc_vol1/3.3)*EPWM1_PRD;
   get_PI_signal1(error_list1);
   get_PI_signal2(error_list2);
 
@@ -574,25 +575,6 @@ __interrupt void adc1_isr(void)
   return;
 }
 
-float adc0_result_int;
-__interrupt void adc2_isr(void)
-{
-  adc0_result_int = (int)((AdcResult.ADCRESULT0/4096.0)*EPWM1_PRD);
-
-  EPwm1Regs.CMPA.half.CMPA = adc0_result_int;
-
-  //
-  // Clear ADCINT1 flag reinitialize for next SOC
-  //
-  AdcRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
-
-  //
-  // Acknowledge interrupt to PIE
-  //
-  PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-
-  return;
-}
 //
 // cpu_timer0_isr -
 //
