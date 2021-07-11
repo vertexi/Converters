@@ -211,22 +211,27 @@ uint16_t LoopCount;
 uint16_t ConversionCount;
 #define sample_size 16
 #define SAMPLE_MEAN_SHIFT 3
+uint16_t Voltage0[sample_size] = {0};
 uint16_t Voltage1[sample_size] = {0};
 uint16_t Voltage2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
 #define vol_slope 3.15278;
 float current_slope = 1.81;
-float ADC_ADJ = 0.06;
+float ADC_ADJ = 0;
 
 void initPWM();
 void initTimer();
 void initMyAdc();
 float error_list[3] = {1,1,1};
 void get_PI_signal();
-uint16_t pre_storage_adc(void);
+uint16_t pre_storage_adc0(void);
+uint16_t pre_storage_adc1(void);
+uint16_t pre_storage_adc2(void);
 
-float target_vol = 8;
-float adc_vol = 0;
+float target_vol = 4;
+double adc_vol0 = 0;
+float adc_vol1 = 0;
+float adc_vol2 = 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
@@ -246,6 +251,7 @@ void main(void)
   int i;
   for (i = 0; i < sample_size; i++)
   {
+    Voltage0[i] = 0;
     Voltage1[i] = 0;
     Voltage2[i] = 0;
   }
@@ -432,7 +438,7 @@ void initMyAdc()
   InitAdc();  // For this example, init the ADC
   //AdcOffsetSelfCal();
 
-  // Ê¹ÄÜADCINT1ÎªINT1.1
+  // Ê¹ï¿½ï¿½ADCINT1ÎªINT1.1
   //
   // Step 5. User specific code, enable interrupts:
   // Enable ADCINT1 in PIE
@@ -453,7 +459,7 @@ void initMyAdc()
   //
   EALLOW;
 
-  // Éè¶¨ADC²ÉÑùÍê³Éºó´¥·¢ÖÐ¶Ï£¬ÇÒÐèÓÃ»§ÊÖ¶¯CLEAR FLAGºó²ÅÄÜÔÙ´Î´¥·¢ÖÐ¶Ï(non-continus mode)
+  // ï¿½è¶¨ADCï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºó´¥·ï¿½ï¿½Ð¶Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ö¶ï¿½CLEAR FLAGï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù´Î´ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½(non-continus mode)
   //
   // ADCINT1 trips after AdcResults latch
   //
@@ -465,18 +471,18 @@ void initMyAdc()
   //     AdcRegs.INTSEL1N2.bit.INT2E     = 1;    // Enabled ADCINT2
   //     AdcRegs.INTSEL1N2.bit.INT2CONT  = 0;    // Disable ADCINT2 Continuous mode
 
-  // Ñ¡Ôñ EOC2 Îª ADCINT1 ´¥·¢£¬¼´ SOC2 ¶ÔÓ¦µÄADC²ÉÑùÍê³Éºó´¥·¢
+  // Ñ¡ï¿½ï¿½ EOC2 Îª ADCINT1 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ SOC2 ï¿½ï¿½Ó¦ï¿½ï¿½ADCï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºó´¥·ï¿½
   //
   // setup EOC2 to trigger ADCINT1 to fire
   //
   AdcRegs.INTSEL1N2.bit.INT1SEL   = 2;
   //    AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
 
-  // Éè¶¨ SOC µÄ²ÉÑùÔ´Òý½Å
+  // ï¿½è¶¨ SOC ï¿½Ä²ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½
   //
   // set SOC0 channel select to ADCINA4
   //
-  //     AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
+  AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
 
   //
   // set SOC1 channel select to ADCINA4
@@ -488,13 +494,13 @@ void initMyAdc()
   //
   AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
 
-  // ÉèÖÃÎª EOC ²ÉÑùµÄ´¥·¢Ìõ¼þ£¬5Îªepwm1 soca
-  // ÏÖÔÚÎÒÏëÒªÈ«ÊÖ¶¯Èí¼þ¿ØÖÆ£¬¼´Îª 0 £¬ software only.
+  // ï¿½ï¿½ï¿½ï¿½Îª EOC ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½5Îªepwm1 soca
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÈ«ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½Îª 0 ï¿½ï¿½ software only.
   //
   // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
   // then SOC1
   //
-  //      AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 2;
+  AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 1;
 
   //
   // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
@@ -508,11 +514,11 @@ void initMyAdc()
   //
   AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 1;
 
-  // ÉèÖÃ²ÉÑùÊ±ÖÓ´°¿Ú
+  // ï¿½ï¿½ï¿½Ã²ï¿½ï¿½ï¿½Ê±ï¿½Ó´ï¿½ï¿½ï¿½
   //
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   //
-  //      AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
+  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
 
   //
   // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
@@ -629,24 +635,59 @@ void InitEPwm1Example()
 //
 // adc_isr -
 //
-uint16_t pre_storage_adc(void)
+uint16_t pre_storage_adc0(void)
 {
-  uint16_t pre_value = 0;
-  pre_value = Voltage1[ConversionCount];
-  Voltage1[ConversionCount] = AdcResult.ADCRESULT1;
-  Voltage2[ConversionCount] = AdcResult.ADCRESULT2;
+  volatile uint16_t pre_value = 0;
+  pre_value = Voltage0[ConversionCount];
+  Voltage0[ConversionCount] = AdcResult.ADCRESULT0;
 
-  (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
   return pre_value;
 }
 
+uint16_t pre_storage_adc1(void)
+{
+  volatile uint16_t pre_value = 0;
+  pre_value = Voltage1[ConversionCount];
+  Voltage1[ConversionCount] = AdcResult.ADCRESULT1;
+
+  return pre_value;
+}
+
+uint16_t pre_storage_adc2(void)
+{
+  volatile uint16_t pre_value = 0;
+  pre_value = Voltage2[ConversionCount];
+  Voltage2[ConversionCount] = AdcResult.ADCRESULT2;
+
+  return pre_value;
+}
+
+
 __interrupt void adc1_isr(void)
 {
-  static int32_t adc_sum = 0;
-  adc_sum -= pre_storage_adc();
-  adc_sum += AdcResult.ADCRESULT1;
+  volatile static int32_t adc_sum0 = 0;
+  adc_sum0 -= pre_storage_adc0();
+  adc_sum0 += AdcResult.ADCRESULT0;
 
-  adc_vol = ((double)adc_sum/(double)(sample_size*4096.0)+ADC_ADJ)*3.3*vol_slope;
+  static int32_t adc_sum1 = 0;
+  adc_sum1 -= pre_storage_adc1();
+  adc_sum1 += AdcResult.ADCRESULT1;
+
+  static int32_t adc_sum2 = 0;
+  adc_sum2 -= pre_storage_adc2();
+  adc_sum2 += AdcResult.ADCRESULT2;
+
+  volatile double adc_0_test = 0;
+  adc_0_test = (double)adc_sum0/(double)(sample_size*4096.0);
+  adc_0_test = (double)(adc_0_test*3.3f*1.0413f-0.0003f);
+  adc_0_test = (double)(adc_0_test*5.19755f+1.68811f);
+  adc_vol0 = adc_0_test;
+  adc_vol1 = ((double)adc_sum1/(double)(sample_size*4096.0)+ADC_ADJ)*3.3*1.0575+0.0208;
+  adc_vol2 = ((double)adc_sum2/(double)(sample_size*4096.0)+ADC_ADJ)*3.3*1.0575+0.0208;
+//  adc_vol1 *= vol_slope;
+
+  //EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-(adc_vol2/3.3)*EPWN1_PRD;
+  (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
   get_PI_signal();
 
   // Clear ADCINT1 flag reinitialize for next SOC
@@ -735,12 +776,23 @@ void get_PI_signal()
     first_flag++;
   }
 
-  error_list[1] = target_vol - adc_vol;
+  error_list[1] = target_vol - adc_vol0;
   P_error = P_arg*(error_list[1] - error_list[0]);
   I_error = I_arg*(T_sam*error_list[1]);
   error_list[2] = error_list[2] + P_error + I_en*I_error;
 
   error_list[0] = error_list[1];
+
+  if (error_list[2] > 96 && error_list[1] > 0)
+  {
+    I_en = 0;
+  } else if (error_list[2] < 0 && error_list[1] < 0)
+  {
+    I_en = 0;
+  } else
+  {
+    I_en = 1;
+  }
 
   if (error_list[2] > 96)
   {
@@ -759,17 +811,5 @@ void get_PI_signal()
 
   EPwm1Regs.CMPA.half.CMPA = EPWN1_PRD-error_list[2]/100*EPWN1_PRD;
 
-  if (error_list[2] > 96 && error_list[1] > 0)
-  {
-    I_en = 0;
-    return;
-  }
-  if (error_list[2] < 0 && error_list[1] < 0)
-  {
-    I_en = 0;
-    return;
-  }
-
-  I_en = 1;
   return;
 }

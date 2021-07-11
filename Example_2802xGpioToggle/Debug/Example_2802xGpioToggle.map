@@ -1,7 +1,7 @@
 ******************************************************************************
              TMS320C2000 Linker PC v20.2.1                     
 ******************************************************************************
->> Linked Wed Jun 23 20:50:55 2021
+>> Linked Mon Jul 12 12:02:08 2021
 
 OUTPUT FILE NAME:   <Example_2802xGpioToggle.out>
 ENTRY POINT SYMBOL: "code_start"  address: 00000000
