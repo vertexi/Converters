@@ -67,21 +67,22 @@ float INIT_DUTY0 = 20; // for pwm1
 float INIT_DUTY1 = 20; // for pwm2
 #define INIT_PI0 20; // for pwm1+pwm2
 #define INIT_PI1 1; // for pwm1/pwm2
+float DUTY_HIGH = 80;
 float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
-float ADC0_slope = 1.0575;
-float ADC0_intercept = 0.0208;
+float ADC0_slope = 1.0413;
+float ADC0_intercept = -0.0003;
 float ADC1_slope = 1.0575;
 float ADC1_intercept = 0.0208;
 float ADC2_slope = 1.0575;
 float ADC2_intercept = 0.0408;
-float ADC0_ADJ = 0;
-float ADC1_ADJ = 0;
+float ADC0_ADJ = 0.0;
+float ADC1_ADJ = 0.0;
 float ADC2_ADJ = 0.0;
 
-float slope0 = 3.15278;
-float intercept0 = 0;        //valtage1
+float slope0 = 5.5678;
+float intercept0 = -1.2200;        //valtage1
 float slope1 = 0.8967;
 float intercept1 = -0.14471; //current1
 float slope2 = 0.750788;
@@ -93,16 +94,16 @@ float adc_value2 = 0;// current2
 float adc_value3 = 0;// current1/current2
 
 float target_0 = 8; // expect value for valtage
-float target_k = 1.5; // current 1/ current 2
+float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
 float P_arg0 = 50;
-float I_arg0 = 100;
-float P_arg1 = 50;
-float I_arg1 = 20;
+float I_arg0 = 300;
+float P_arg1 = 0.1;
+float I_arg1 = 200;
 
 // Main
 void main(void)
@@ -444,17 +445,21 @@ int32_t pre_storage_adc2(void)
   return adc_sum2;
 }
 
-float adc_vol0 = 0;
-float adc_vol1 = 0;
-float adc_vol2 = 0;
+volatile float adc_vol0 = 0;
+volatile float adc_vol1 = 0;
+volatile float adc_vol2 = 0;
 __interrupt void adc1_isr(void)
 {
+  volatile float temp;
   adc_vol0 = ((double)pre_storage_adc0()/(double)(sample_size*4096.0))*3.3*ADC0_slope+ADC0_intercept;
-  adc_value0 = adc_vol0*slope0+intercept0;
+  temp = adc_vol0*slope0+intercept0;
+  adc_value0 = temp;
   adc_vol1 = ((double)pre_storage_adc1()/(double)(sample_size*4096.0))*3.3*ADC1_slope+ADC1_intercept;
-  adc_value1 = adc_vol1;
+  temp = adc_vol1;
+  adc_value1 = temp;
   adc_vol2 = ((double)pre_storage_adc2()/(double)(sample_size*4096.0))*3.3*ADC2_slope+ADC2_intercept;
-  adc_value2 = adc_vol2;
+  temp = adc_vol2;
+  adc_value2 = temp;
 
   adc_value3 = adc_value1 / adc_value2;
 
@@ -494,7 +499,7 @@ void get_PI_signal0(float *error_list)
 
   error_list[0] = error_list[1];
 
-  if (error_list[2] > 96*2 && error_list[1] > 0)
+  if (error_list[2] > DUTY_HIGH*2 && error_list[1] > 0)
   {
     I_en = 0;
   }else if (error_list[2] < 3 && error_list[1] < 0)
@@ -505,7 +510,7 @@ void get_PI_signal0(float *error_list)
     I_en = 1;
   }
 
-  if (error_list[2] > 96*2)
+  if (error_list[2] > DUTY_HIGH*2)
   {
     if (first_flag < 50)
     {
@@ -513,7 +518,7 @@ void get_PI_signal0(float *error_list)
       first_flag = 55;
     } else
     {
-      error_list[2] = 96*2;
+      error_list[2] = DUTY_HIGH*2;
     }
   } else if (error_list[2] < 3)
   {
@@ -548,10 +553,10 @@ void get_PI_signal1(float *error_list)
   pwm1 = error_list1[2]*pwm2;
 
   // Integratation limitation of PI control algorithm
-  if ((error_list[2] > 10||(pwm1 > 96 || pwm2 < 3)) && error_list[1] > 0)
+  if ((error_list[2] > 10||(pwm1 > DUTY_HIGH || pwm2 < 3)) && error_list[1] > 0)
   {
     I_en = 0;
-  } else if ((error_list[2] < 0.1||(pwm2 > 96 || pwm1 < 3)) && error_list[1] < 0)
+  } else if ((error_list[2] < 0.1||(pwm2 > DUTY_HIGH || pwm1 < 3)) && error_list[1] < 0)
   {
     I_en = 0;
   } else
@@ -573,7 +578,7 @@ void get_PI_signal1(float *error_list)
     }
   }
   // keep track the first time pwm duty in 3~96 range
-  if (pwm1 > 96 || pwm1 < 3)
+  if (pwm1 > DUTY_HIGH || pwm1 < 3)
   {
     if (first_flag < 50)
     {
@@ -581,7 +586,7 @@ void get_PI_signal1(float *error_list)
       first_flag = 55;
     }
   }
-  if (pwm2 > 96 || pwm2 < 3)
+  if (pwm2 > DUTY_HIGH || pwm2 < 3)
   {
     if (first_flag < 50)
     {
@@ -600,13 +605,13 @@ void get_PI_signal1(float *error_list)
   }
 
   // limitation the proportion pwm duty
-  if (pwm1 > 96)
+  if (pwm1 > DUTY_HIGH)
   {
-    pwm1 = 96;
+    pwm1 = DUTY_HIGH;
   }
-  if (pwm2 > 96)
+  if (pwm2 > DUTY_HIGH)
   {
-    pwm2 = 96;
+    pwm2 = DUTY_HIGH;
   }
   if (pwm1 < 3)
   {
