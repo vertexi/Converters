@@ -82,13 +82,13 @@ float ADC1_ADJ = 0.0;
 float ADC2_ADJ = 0.0;
 
 float slope0 = 5.5678;
-float intercept0 = -1.2200;        //valtage1
+float intercept0 = -1.2200;  //valtage1
 float slope1 = 0.8967;
 float intercept1 = -0.14471; //current1
 float slope2 = 0.750788;
 float intercept2 = -0.02822; //current2
 
-float adc_value0 = 0;// voltage1
+float adc_value0 = 0;// voltage1 47kohm/10kohm
 float adc_value1 = 0;// current1
 float adc_value2 = 0;// current2
 float adc_value3 = 0;// current1/current2
@@ -101,9 +101,9 @@ float target_k = 1; // current 1/ current 2
 #define ADC_PERIOD 100
 float T_sam = 0.000100;
 float P_arg0 = 50;
-float I_arg0 = 300;
+float I_arg0 = 1000;
 float P_arg1 = 0.1;
-float I_arg1 = 200;
+float I_arg1 = 150;
 
 // Main
 void main(void)
@@ -448,6 +448,7 @@ int32_t pre_storage_adc2(void)
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
+
 __interrupt void adc1_isr(void)
 {
   volatile float temp;
@@ -540,7 +541,7 @@ void get_PI_signal1(float *error_list)
   static int I_en = 1;
   static int first_flag = 0;
 
-  error_list[1] = target_k - adc_value3;
+  error_list[1] = target_k*0.76528+0.21723 - adc_value3;
   P_error1 = P_arg1*(error_list[1] - error_list[0]);
   I_error1 = I_en*I_arg1*(T_sam*error_list[1]);
   error_list[2] = error_list[2] + P_error1 + I_error1;
