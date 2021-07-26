@@ -1,7 +1,7 @@
 ******************************************************************************
              TMS320C2000 Linker PC v20.2.1                     
 ******************************************************************************
->> Linked Thu Jul 22 16:56:24 2021
+>> Linked Mon Jul 26 20:50:43 2021
 
 OUTPUT FILE NAME:   <Example_28027_Flash.out>
 ENTRY POINT SYMBOL: "code_start"  address: 003f7ff6
@@ -58,6 +58,7 @@ PAGE 1:
   I2CA                  00007900   00000040  00000022  0000001e  RWIX
   RAML0                 00008000   00000400  00000000  00000400  RWIX
   PARTID                003d7fff   00000001  00000001  00000000  RWIX
+  EXRAM                 003f0000   00002000  00000000  00002000  RWIX
   CSM_PWL               003f7ff8   00000008  00000008  00000000  RWIX
 
 
@@ -88,10 +89,6 @@ ramfuncs   0    003f7000    0000038a     RUN ADDR = 00000050
 
 csm_rsvd   0    003f7f80    00000076     
                   003f7f80    00000076     f2802x_csmpasswords.obj (csm_rsvd)
-
-codestart 
-*          0    003f7ff6    00000002     
-                  003f7ff6    00000002     f2802x_codestartbranch.obj (codestart)
 
 DevEmuRegsFile 
 *          1    00000880    00000004     UNINITIALIZED
@@ -224,6 +221,10 @@ PartIdRegsFile
 CsmPwlFile 
 *          1    003f7ff8    00000008     UNINITIALIZED
                   003f7ff8    00000008     F2802x_GlobalVariableDefs.obj (CsmPwlFile)
+
+codestart 
+*          0    003f7ff6    00000002     
+                  003f7ff6    00000002     f2802x_codestartbranch.obj (codestart)
 
 .pinit     0    003f7000    00000000     UNINITIALIZED
 

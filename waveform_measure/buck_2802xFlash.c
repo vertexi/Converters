@@ -8,10 +8,6 @@
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
-#pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
-#pragma CODE_SECTION(pre_storage_adc1, "ramfuncs");
-#pragma CODE_SECTION(pre_storage_adc2, "ramfuncs");
-//#pragma CODE_SECTION(adc2_isr, "ramfuncs");
 
 // Function Prototypes
 __interrupt void cpu_timer0_isr(void);
@@ -24,18 +20,13 @@ __interrupt void epwm1_isr(void);
 
 // Globals
 uint32_t  EPwm1TimerIntCount;
-uint16_t  EPwm1_DB_Direction;
-uint16_t  EPwm2_DB_Direction;
+uint16_t ConversionCount;
 
 // Defines for the maximum Dead Band values
-#define EPWM1_MAX_DB   0x03FF
+#define EPWM1_MAX_DB   0x0000
 #define EPWM1_MIN_DB   0x0000
 #define EPWM2_MIN_DB   0x0000
-#define EPWM1_PRD 1200
-
-// Defines that keep track of which way the Dead Band is moving
-#define DB_UP   1
-#define DB_DOWN 0
+#define EPWM1_PRD 2400
 
 // These are defined by the linker
 extern uint16_t RamfuncsLoadStart;
@@ -46,14 +37,6 @@ extern uint16_t RamfuncsRunStart;
 __interrupt void adc1_isr(void);
 void Adc_Config(void);
 
-// Globals
-uint16_t LoopCount;
-uint16_t ConversionCount;
-#define sample_size 50
-uint16_t ADC0[sample_size] = {0};
-uint16_t ADC1[sample_size] = {0};
-uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
-
 void initPWM();
 void initTimer();
 void initMyAdc();
@@ -62,6 +45,8 @@ void get_PI_signal1(float *error_list);
 int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
 int32_t pre_storage_adc2(void);
+void adc_error_clear(void);
+void adc_calculate(void);
 
 float INIT_DUTY0; // for pwm1
 float INIT_DUTY1; // for pwm2 initialize in main()
@@ -70,6 +55,12 @@ float INIT_DUTY1; // for pwm2 initialize in main()
 float DUTY_HIGH = 80;
 float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
+
+#define sample_size 120
+//uint16_t ADC0[sample_size] = {0};
+int16_t ADC1[sample_size] = {0};
+//uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
+uint16_t spwm_c[sample_size] = {0};
 
 float ADC0_slope = 1.0413;
 float ADC0_intercept = -0.0003;
@@ -88,6 +79,9 @@ float intercept1 = -0.14471; //current1
 float slope2 = 0.750788;
 float intercept2 = -0.02822; //current2
 
+volatile float adc_vol0 = 0;
+volatile float adc_vol1 = 0;
+volatile float adc_vol2 = 0;
 float adc_value0 = 0;// voltage1 47kohm/10kohm
 float adc_value1 = 0;// current1
 float adc_value2 = 0;// current2
@@ -98,99 +92,58 @@ float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define ADC_PERIOD 1000
-float T_sam = 0.000100;
+#define ADC_PERIOD 500
+float T_sam = 0.000500;
 float P_arg0 = 50;
 float I_arg0 = 1000;
 float P_arg1 = 0.1;
 float I_arg1 = 150;
 
-#define spwm_size 500
-uint16_t spwm_table[spwm_size] = {543  , 550  , 557  , 564  , 571  , 577  ,
-                               584  , 591  , 598  , 604  , 611  , 618  ,
-                               624  , 631  , 638  , 645  , 651  , 658  ,
-                               664  , 671  , 678  , 684  , 691  , 697  ,
-                               704  , 710  , 717  , 723  , 729  , 736  ,
-                               742  , 748  , 754  , 761  , 767  , 773  ,
-                               779  , 785  , 791  , 797  , 803  , 809  ,
-                               815  , 821  , 826  , 832  , 838  , 844  ,
-                               849  , 855  , 860  , 866  , 871  , 876  ,
-                               882  , 887  , 892  , 897  , 902  , 907  ,
-                               912  , 917  , 922  , 927  , 931  , 936  ,
-                               941  , 945  , 950  , 954  , 958  , 962  ,
-                               967  , 971  , 975  , 979  , 983  , 987  ,
-                               990  , 994  , 998  , 1001 , 1005 , 1008 ,
-                               1012 , 1015 , 1018 , 1021 , 1024 , 1027 ,
-                               1030 , 1033 , 1036 , 1038 , 1041 , 1043 ,
-                               1046 , 1048 , 1050 , 1053 , 1055 , 1057 ,
-                               1059 , 1060 , 1062 , 1064 , 1065 , 1067 ,
-                               1068 , 1070 , 1071 , 1072 , 1073 , 1074 ,
-                               1075 , 1076 , 1077 , 1078 , 1078 , 1079 ,
-                               1079 , 1079 , 1080 , 1080 , 1080 , 1080 ,
-                               1080 , 1080 , 1079 , 1079 , 1079 , 1078 ,
-                               1078 , 1077 , 1076 , 1075 , 1074 , 1073 ,
-                               1072 , 1071 , 1070 , 1068 , 1067 , 1065 ,
-                               1064 , 1062 , 1060 , 1059 , 1057 , 1055 ,
-                               1053 , 1050 , 1048 , 1046 , 1043 , 1041 ,
-                               1038 , 1036 , 1033 , 1030 , 1027 , 1024 ,
-                               1021 , 1018 , 1015 , 1012 , 1008 , 1005 ,
-                               1001 , 998  , 994  , 990  , 987  , 983  ,
-                               979  , 975  , 971  , 967  , 962  , 958  ,
-                               954  , 950  , 945  , 941  , 936  , 931  ,
-                               927  , 922  , 917  , 912  , 907  , 902  ,
-                               897  , 892  , 887  , 882  , 876  , 871  ,
-                               866  , 860  , 855  , 849  , 844  , 838  ,
-                               832  , 826  , 821  , 815  , 809  , 803  ,
-                               797  , 791  , 785  , 779  , 773  , 767  ,
-                               761  , 754  , 748  , 742  , 736  , 729  ,
-                               723  , 717  , 710  , 704  , 697  , 691  ,
-                               684  , 678  , 671  , 664  , 658  , 651  ,
-                               645  , 638  , 631  , 624  , 618  , 611  ,
-                               604  , 598  , 591  , 584  , 577  , 571  ,
-                               564  , 557  , 550  , 543  , 537  , 530  ,
-                               523  , 516  , 509  , 503  , 496  , 489  ,
-                               482  , 476  , 469  , 462  , 456  , 449  ,
-                               442  , 435  , 429  , 422  , 416  , 409  ,
-                               402  , 396  , 389  , 383  , 376  , 370  ,
-                               363  , 357  , 351  , 344  , 338  , 332  ,
-                               326  , 319  , 313  , 307  , 301  , 295  ,
-                               289  , 283  , 277  , 271  , 265  , 259  ,
-                               254  , 248  , 242  , 236  , 231  , 225  ,
-                               220  , 214  , 209  , 204  , 198  , 193  ,
-                               188  , 183  , 178  , 173  , 168  , 163  ,
-                               158  , 153  , 149  , 144  , 139  , 135  ,
-                               130  , 126  , 122  , 118  , 113  , 109  ,
-                               105  , 101  , 97   , 93   , 90   , 86   ,
-                               82   , 79   , 75   , 72   , 68   , 65   ,
-                               62   , 59   , 56   , 53   , 50   , 47   ,
-                               44   , 42   , 39   , 37   , 34   , 32   ,
-                               30   , 27   , 25   , 23   , 21   , 20   ,
-                               18   , 16   , 15   , 13   , 12   , 10   ,
-                               9    , 8    , 7    , 6    , 5    , 4    ,
-                               3    , 2    , 2    , 1    , 1    , 1    ,
-                               0    , 0    , 0    , 0    , 0    , 0    ,
-                               1    , 1    , 1    , 2    , 2    , 3    ,
-                               4    , 5    , 6    , 7    , 8    , 9    ,
-                               10   , 12   , 13   , 15   , 16   , 18   ,
-                               20   , 21   , 23   , 25   , 27   , 30   ,
-                               32   , 34   , 37   , 39   , 42   , 44   ,
-                               47   , 50   , 53   , 56   , 59   , 62   ,
-                               65   , 68   , 72   , 75   , 79   , 82   ,
-                               86   , 90   , 93   , 97   , 101  , 105  ,
-                               109  , 113  , 118  , 122  , 126  , 130  ,
-                               135  , 139  , 144  , 149  , 153  , 158  ,
-                               163  , 168  , 173  , 178  , 183  , 188  ,
-                               193  , 198  , 204  , 209  , 214  , 220  ,
-                               225  , 231  , 236  , 242  , 248  , 254  ,
-                               259  , 265  , 271  , 277  , 283  , 289  ,
-                               295  , 301  , 307  , 313  , 319  , 326  ,
-                               332  , 338  , 344  , 351  , 357  , 363  ,
-                               370  , 376  , 383  , 389  , 396  , 402  ,
-                               409  , 416  , 422  , 429  , 435  , 442  ,
-                               449  , 456  , 462  , 469  , 476  , 482  ,
-                               489  , 496  , 503  , 509  , 516  , 523  ,
-                               530  , 537};
-int spwm_counter = 0;
+#define spwm_size 250
+uint16_t spwm_table[spwm_size] = {
+  547  , 560  , 574  , 587  , 601  , 614  ,
+  628  , 641  , 654  , 668  , 681  , 694  ,
+  707  , 720  , 732  , 745  , 758  , 770  ,
+  782  , 794  , 806  , 818  , 829  , 841  ,
+  852  , 863  , 874  , 884  , 895  , 905  ,
+  915  , 924  , 934  , 943  , 952  , 960  ,
+  969  , 977  , 985  , 992  , 1000 , 1007 ,
+  1013 , 1020 , 1026 , 1031 , 1037 , 1042 ,
+  1047 , 1051 , 1056 , 1059 , 1063 , 1066 ,
+  1069 , 1072 , 1074 , 1076 , 1077 , 1078 ,
+  1079 , 1080 , 1080 , 1080 , 1079 , 1078 ,
+  1077 , 1076 , 1074 , 1072 , 1069 , 1066 ,
+  1063 , 1059 , 1056 , 1051 , 1047 , 1042 ,
+  1037 , 1031 , 1026 , 1020 , 1013 , 1007 ,
+  1000 , 992  , 985  , 977  , 969  , 960  ,
+  952  , 943  , 934  , 924  , 915  , 905  ,
+  895  , 884  , 874  , 863  , 852  , 841  ,
+  829  , 818  , 806  , 794  , 782  , 770  ,
+  758  , 745  , 732  , 720  , 707  , 694  ,
+  681  , 668  , 654  , 641  , 628  , 614  ,
+  601  , 587  , 574  , 560  , 547  , 533  ,
+  520  , 506  , 493  , 479  , 466  , 452  ,
+  439  , 426  , 412  , 399  , 386  , 373  ,
+  360  , 348  , 335  , 322  , 310  , 298  ,
+  286  , 274  , 262  , 251  , 239  , 228  ,
+  217  , 206  , 196  , 185  , 175  , 165  ,
+  156  , 146  , 137  , 128  , 120  , 111  ,
+  103  , 95   , 88   , 80   , 73   , 67   ,
+  60   , 54   , 49   , 43   , 38   , 33   ,
+  29   , 24   , 21   , 17   , 14   , 11   ,
+  8    , 6    , 4    , 3    , 2    , 1    ,
+  0    , 0    , 0    , 1    , 2    , 3    ,
+  4    , 6    , 8    , 11   , 14   , 17   ,
+  21   , 24   , 29   , 33   , 38   , 43   ,
+  49   , 54   , 60   , 67   , 73   , 80   ,
+  88   , 95   , 103  , 111  , 120  , 128  ,
+  137  , 146  , 156  , 165  , 175  , 185  ,
+  196  , 206  , 217  , 228  , 239  , 251  ,
+  262  , 274  , 286  , 298  , 310  , 322  ,
+  335  , 348  , 360  , 373  , 386  , 399  ,
+  412  , 426  , 439  , 452  , 466  , 479  ,
+  493  , 506  , 520  , 533};
+volatile int spwm_counter = 0;
 float spwm_coff = 1;
 
 
@@ -204,9 +157,10 @@ void main(void)
   int i;
   for (i = 0; i < sample_size; i++)
   {
-    ADC0[i] = 0;
+    //ADC0[i] = 0;
     ADC1[i] = 0;
-    ADC2[i] = 0;
+    spwm_c[i] = 0;
+    //ADC2[i] = 0;
   }
   INIT_DUTY0 = spwm_table[0];
   INIT_DUTY1 = spwm_table[0];
@@ -366,7 +320,6 @@ void initMyAdc()
   EINT;                              // Enable Global interrupt INTM
   ERTM;                              // Enable Global realtime interrupt DBGM
 
-  LoopCount = 0;
   ConversionCount = 0;
 
   // Configure ADC
@@ -465,7 +418,6 @@ void InitEPwm1Example()
   EPwm1Regs.DBCTL.bit.IN_MODE = DBA_ALL;
   EPwm1Regs.DBRED = EPWM1_MIN_DB;
   EPwm1Regs.DBFED = EPWM1_MIN_DB;
-  EPwm1_DB_Direction = DB_UP;
 
   // Interrupt where we will change the Deadband
   EPwm1Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
@@ -507,62 +459,53 @@ void InitEPwm2Example()
   EPwm2Regs.DBCTL.bit.IN_MODE = DBA_ALL;
   EPwm2Regs.DBRED = EPWM2_MIN_DB;
   EPwm2Regs.DBFED = EPWM2_MIN_DB;
-  EPwm2_DB_Direction = DB_UP;
 }
 
-int32_t pre_storage_adc0(void)
+int16_t adc_max = 0;
+uint16_t adc_min = 5000;
+int16_t adc_max_index = 0;
+int16_t adc_min_index = 0;
+uint16_t adc_max_spwm = 0;
+
+float adc_amplitude = 0;
+float adc_cycle = 0;
+float adc_phase = 0;
+
+float phase1_amplitude = 0;
+float phase1_freq = 0;
+float phase1_phase = 0;
+
+void adc_error_clear(void)
 {
-  static int32_t adc_sum0 = 0;
-  adc_sum0 -= ADC0[ConversionCount];
-  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
-  adc_sum0 += AdcResult.ADCRESULT0;
-  return adc_sum0;
+  int i;
+  for (i = 0; i < sample_size; i++)
+  {
+    ADC1[i] = 0;
+    spwm_c[i] = 0;
+  }
+  adc_max = 0;
+  adc_min = 5000;
+  adc_max_index = 0;
+  adc_min_index = 0;
+  adc_max_spwm = 0;
+
+  ConversionCount = 0;
 }
 
-
-int32_t pre_storage_adc1(void)
-{
-  static int32_t adc_sum1 = 0;
-  adc_sum1 -= ADC1[ConversionCount];
-  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
-  adc_sum1 += AdcResult.ADCRESULT1;
-  return adc_sum1;
-}
-
-int32_t pre_storage_adc2(void)
-{
-  static int32_t adc_sum2 = 0;
-  adc_sum2 -= ADC2[ConversionCount];
-  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
-  adc_sum2 += AdcResult.ADCRESULT2;
-  return adc_sum2;
-}
-
-volatile float adc_vol0 = 0;
-volatile float adc_vol1 = 0;
-volatile float adc_vol2 = 0;
-
-long adc_count = 0;
 __interrupt void adc1_isr(void)
 {
-  adc_count++;
-  volatile float temp;
-  //adc_vol0 = ((double)pre_storage_adc0()/(double)(sample_size*4096.0))*3.3*ADC0_slope+ADC0_intercept;
-  //temp = adc_vol0;
-  //adc_value0 = temp;
-  adc_vol1 = ((double)pre_storage_adc1()/(double)(sample_size*4096.0))*3.3*ADC1_slope+ADC1_intercept;
-  temp = adc_vol1;
-  adc_value1 = temp;
-  //adc_vol2 = ((double)pre_storage_adc2()/(double)(sample_size*4096.0))*3.3*ADC2_slope+ADC2_intercept;
-  //temp = adc_vol2;
-  //adc_value2 = temp;
+  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
+  (ConversionCount == sample_size-1) ? (adc_calculate()) : (ConversionCount++);
 
-  //adc_value3 = adc_value1 / adc_value2;
-
-  //get_PI_signal0(error_list0);
-  //get_PI_signal1(error_list1);
-
-  (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
+//  if (adc_max < AdcResult.ADCRESULT1)
+//  {
+//      adc_max = AdcResult.ADCRESULT1;
+//  }
+//  if (adc_min > AdcResult.ADCRESULT1)
+//  {
+//      adc_min = AdcResult.ADCRESULT1;
+////      adc_min_index = ConversionCount-1;
+//  }
 
   // Clear ADCINT1 flag reinitialize for next SOC
   AdcRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
@@ -571,6 +514,59 @@ __interrupt void adc1_isr(void)
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
   return;
+}
+
+void adc_calculate(void)
+{
+  int i = sample_size-3;
+  int16_t temp = 0;
+  int max_search = 0;
+  int min_search = 0;
+
+  for ( ;i >= 2; i--)
+  {
+          if ((ADC1[i] - ADC1[i-1])>=0 && (ADC1[i] - ADC1[i-2])>=0 &&
+              (ADC1[i] - ADC1[i+1])>=0 && (ADC1[i] - ADC1[i+2])>=0)
+          {
+              adc_max = ADC1[i];
+              adc_max_index = i;
+              adc_max_spwm = spwm_c[i];
+              max_search = 1;
+              break;
+          }
+  }
+
+  for ( ;i >= 2; i--)
+  {
+          if ((ADC1[i] < adc_max) && (ADC1[i] - ADC1[i-1])<=0 && (ADC1[i] - ADC1[i-2])<=0 &&
+              (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 &&
+              (adc_max_index - i)>((float)(EPwm1Regs.TBPRD)/240))
+          {
+              adc_min = ADC1[i];
+              adc_min_index = i;
+              min_search = 1;
+              break;
+          }
+  }
+
+  if (max_search == 1 && min_search == 1)
+  {
+      adc_amplitude = (float)(adc_max - adc_min);
+      adc_cycle = (float)(adc_max_index - adc_min_index)*2;
+      if (adc_cycle < 0) adc_cycle *= -1;
+      adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
+
+      if (adc_phase > 180)
+      {
+        adc_phase = -1*(adc_phase - 180);
+      }
+
+      phase1_amplitude = (adc_amplitude/4096.0)*3.3*ADC1_slope+ADC1_intercept;
+      phase1_freq = 1/(T_sam*adc_cycle);
+      phase1_phase = adc_phase;
+  }
+
+  adc_error_clear();
 }
 
 float P_error0 = 0;
@@ -747,6 +743,7 @@ __interrupt void cpu_timer1_isr(void)
 // cpu_timer2_isr -
 __interrupt void cpu_timer2_isr(void)
 {
+  spwm_c[ConversionCount] = spwm_counter;
   EALLOW;
   CpuTimer2.InterruptCount++;
 
