@@ -56,7 +56,7 @@ float DUTY_HIGH = 80;
 float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
-#define sample_size 120
+#define sample_size 70
 //uint16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 //uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -101,49 +101,50 @@ float I_arg1 = 150;
 
 #define spwm_size 250
 uint16_t spwm_table[spwm_size] = {1094 , 1121 , 1148 , 1175 , 1202 , 1229 ,
-                                  1256 , 1282 , 1309 , 1335 , 1362 , 1388 ,
-                                  1414 , 1439 , 1465 , 1490 , 1515 , 1540 ,
-                                  1564 , 1588 , 1612 , 1636 , 1659 , 1681 ,
-                                  1704 , 1726 , 1747 , 1768 , 1789 , 1809 ,
-                                  1829 , 1848 , 1867 , 1886 , 1903 , 1921 ,
-                                  1937 , 1954 , 1969 , 1985 , 1999 , 2013 ,
-                                  2026 , 2039 , 2051 , 2063 , 2074 , 2084 ,
-                                  2094 , 2103 , 2111 , 2119 , 2126 , 2132 ,
-                                  2138 , 2143 , 2148 , 2151 , 2155 , 2157 ,
-                                  2159 , 2160 , 2160 , 2160 , 2159 , 2157 ,
-                                  2155 , 2151 , 2148 , 2143 , 2138 , 2132 ,
-                                  2126 , 2119 , 2111 , 2103 , 2094 , 2084 ,
-                                  2074 , 2063 , 2051 , 2039 , 2026 , 2013 ,
-                                  1999 , 1985 , 1969 , 1954 , 1937 , 1921 ,
-                                  1903 , 1886 , 1867 , 1848 , 1829 , 1809 ,
-                                  1789 , 1768 , 1747 , 1726 , 1704 , 1681 ,
-                                  1659 , 1636 , 1612 , 1588 , 1564 , 1540 ,
-                                  1515 , 1490 , 1465 , 1439 , 1414 , 1388 ,
-                                  1362 , 1335 , 1309 , 1282 , 1256 , 1229 ,
-                                  1202 , 1175 , 1148 , 1121 , 1094 , 1066 ,
-                                  1039 , 1012 , 985  , 958  , 931  , 904  ,
-                                  878  , 851  , 825  , 798  , 772  , 746  ,
-                                  721  , 695  , 670  , 645  , 620  , 596  ,
-                                  572  , 548  , 524  , 501  , 479  , 456  ,
-                                  434  , 413  , 392  , 371  , 351  , 331  ,
-                                  312  , 293  , 274  , 257  , 239  , 223  ,
-                                  206  , 191  , 175  , 161  , 147  , 134  ,
-                                  121  , 109  , 97   , 86   , 76   , 66   ,
-                                  57   , 49   , 41   , 34   , 28   , 22   ,
-                                  17   , 12   , 9    , 5    , 3    , 1    ,
-                                  0    , 0    , 0    , 1    , 3    , 5    ,
-                                  9    , 12   , 17   , 22   , 28   , 34   ,
-                                  41   , 49   , 57   , 66   , 76   , 86   ,
-                                  97   , 109  , 121  , 134  , 147  , 161  ,
-                                  175  , 191  , 206  , 223  , 239  , 257  ,
-                                  274  , 293  , 312  , 331  , 351  , 371  ,
-                                  392  , 413  , 434  , 456  , 479  , 501  ,
-                                  524  , 548  , 572  , 596  , 620  , 645  ,
-                                  670  , 695  , 721  , 746  , 772  , 798  ,
-                                  825  , 851  , 878  , 904  , 931  , 958  ,
-                                  985  , 1012 , 1039 , 1066};
+  1256 , 1282 , 1309 , 1335 , 1362 , 1388 ,
+  1414 , 1439 , 1465 , 1490 , 1515 , 1540 ,
+  1564 , 1588 , 1612 , 1636 , 1659 , 1681 ,
+  1704 , 1726 , 1747 , 1768 , 1789 , 1809 ,
+  1829 , 1848 , 1867 , 1886 , 1903 , 1921 ,
+  1937 , 1954 , 1969 , 1985 , 1999 , 2013 ,
+  2026 , 2039 , 2051 , 2063 , 2074 , 2084 ,
+  2094 , 2103 , 2111 , 2119 , 2126 , 2132 ,
+  2138 , 2143 , 2148 , 2151 , 2155 , 2157 ,
+  2159 , 2160 , 2160 , 2160 , 2159 , 2157 ,
+  2155 , 2151 , 2148 , 2143 , 2138 , 2132 ,
+  2126 , 2119 , 2111 , 2103 , 2094 , 2084 ,
+  2074 , 2063 , 2051 , 2039 , 2026 , 2013 ,
+  1999 , 1985 , 1969 , 1954 , 1937 , 1921 ,
+  1903 , 1886 , 1867 , 1848 , 1829 , 1809 ,
+  1789 , 1768 , 1747 , 1726 , 1704 , 1681 ,
+  1659 , 1636 , 1612 , 1588 , 1564 , 1540 ,
+  1515 , 1490 , 1465 , 1439 , 1414 , 1388 ,
+  1362 , 1335 , 1309 , 1282 , 1256 , 1229 ,
+  1202 , 1175 , 1148 , 1121 , 1094 , 1066 ,
+  1039 , 1012 , 985  , 958  , 931  , 904  ,
+  878  , 851  , 825  , 798  , 772  , 746  ,
+  721  , 695  , 670  , 645  , 620  , 596  ,
+  572  , 548  , 524  , 501  , 479  , 456  ,
+  434  , 413  , 392  , 371  , 351  , 331  ,
+  312  , 293  , 274  , 257  , 239  , 223  ,
+  206  , 191  , 175  , 161  , 147  , 134  ,
+  121  , 109  , 97   , 86   , 76   , 66   ,
+  57   , 49   , 41   , 34   , 28   , 22   ,
+  17   , 12   , 9    , 5    , 3    , 1    ,
+  0    , 0    , 0    , 1    , 3    , 5    ,
+  9    , 12   , 17   , 22   , 28   , 34   ,
+  41   , 49   , 57   , 66   , 76   , 86   ,
+  97   , 109  , 121  , 134  , 147  , 161  ,
+  175  , 191  , 206  , 223  , 239  , 257  ,
+  274  , 293  , 312  , 331  , 351  , 371  ,
+  392  , 413  , 434  , 456  , 479  , 501  ,
+  524  , 548  , 572  , 596  , 620  , 645  ,
+  670  , 695  , 721  , 746  , 772  , 798  ,
+  825  , 851  , 878  , 904  , 931  , 958  ,
+  985  , 1012 , 1039 , 1066};
 volatile int spwm_counter = 0;
 float spwm_coff = 1;
+uint8_t adc_cal = 0;
 
 
 // Main
@@ -214,7 +215,11 @@ void main(void)
 
   for(;;)
   {
-    __asm("          NOP");
+    //    __asm("          NOP");
+    if (adc_cal == 1)
+    {
+      adc_calculate();
+    }
   }
 }
 
@@ -487,6 +492,7 @@ void adc_error_clear(void)
   adc_max_index = 0;
   adc_min_index = 0;
   adc_max_spwm = 0;
+  adc_cal = 0;
 
   ConversionCount = 0;
 }
@@ -494,17 +500,16 @@ void adc_error_clear(void)
 __interrupt void adc1_isr(void)
 {
   ADC1[ConversionCount] = AdcResult.ADCRESULT1;
-  (ConversionCount == sample_size-1) ? (adc_calculate()) : (ConversionCount++);
+  (ConversionCount == sample_size-1) ? (adc_cal = 1) : (ConversionCount++);
 
-//  if (adc_max < AdcResult.ADCRESULT1)
-//  {
-//      adc_max = AdcResult.ADCRESULT1;
-//  }
-//  if (adc_min > AdcResult.ADCRESULT1)
-//  {
-//      adc_min = AdcResult.ADCRESULT1;
-////      adc_min_index = ConversionCount-1;
-//  }
+  if (adc_max < AdcResult.ADCRESULT1)
+  {
+    adc_max = AdcResult.ADCRESULT1;
+  }
+  if (adc_min > AdcResult.ADCRESULT1)
+  {
+    adc_min = AdcResult.ADCRESULT1;
+  }
 
   // Clear ADCINT1 flag reinitialize for next SOC
   AdcRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
@@ -515,55 +520,64 @@ __interrupt void adc1_isr(void)
   return;
 }
 
+#define adc_cycle_buffer_size 12
+int adc_cycle_counter = 0;
+int adc_cycle_buffer[adc_cycle_buffer_size];
+
 void adc_calculate(void)
 {
   int i = sample_size-3;
-  int16_t temp = 0;
   int max_search = 0;
   int min_search = 0;
 
   for ( ;i >= 2; i--)
   {
-          if ((ADC1[i] - ADC1[i-1])>=0 && (ADC1[i] - ADC1[i-2])>=0 &&
-              (ADC1[i] - ADC1[i+1])>=0 && (ADC1[i] - ADC1[i+2])>=0)
-          {
-              adc_max = ADC1[i];
-              adc_max_index = i;
-              adc_max_spwm = spwm_c[i];
-              max_search = 1;
-              break;
-          }
+    if ((ADC1[i] - ADC1[i-1])>=0 && (ADC1[i] - ADC1[i-2])>=0 &&
+        (ADC1[i] - ADC1[i+1])>=0 && (ADC1[i] - ADC1[i+2])>=0)
+    {
+      adc_max_index = i;
+      adc_max_spwm = spwm_c[i];
+      max_search = 1;
+      break;
+    }
   }
 
   for ( ;i >= 2; i--)
   {
-          if ((ADC1[i] < adc_max) && (ADC1[i] - ADC1[i-1])<=0 && (ADC1[i] - ADC1[i-2])<=0 &&
-              (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 &&
-              (adc_max_index - i)>10)
-          {
-              adc_min = ADC1[i];
-              adc_min_index = i;
-              min_search = 1;
-              break;
-          }
+
+    if ((ADC1[i] < adc_max) && (ADC1[i] - ADC1[i-1])<=0 && (ADC1[i] - ADC1[i-2])<=0 &&
+        (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 && (adc_max_index - i)>15 && (adc_max_index - i)<30)
+    {
+      adc_min_index = i;
+      min_search = 1;
+      break;
+    }
   }
 
   if (max_search == 1 && min_search == 1)
   {
-      adc_amplitude = (float)(adc_max - adc_min);
-      adc_cycle = (float)(adc_max_index - adc_min_index)*2;
-      if (adc_cycle < 0) adc_cycle *= -1;
-      adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
+    adc_cycle_buffer[adc_cycle_counter] = adc_max_index - adc_min_index;
+    (adc_cycle_counter == adc_cycle_buffer_size-1) ? (adc_cycle_counter = 0) : (adc_cycle_counter++);
+    if (adc_cycle_counter == 0)
+    {
+        adc_cycle = 0;
+        int j;
+        for (j = 0; j < adc_cycle_buffer_size; j++)
+        {
+            adc_cycle += adc_cycle_buffer[j];
+        }
+        adc_cycle = (adc_cycle/adc_cycle_buffer_size)*2;
+        if (adc_cycle < 0) adc_cycle *= -1;
+        phase1_freq = 1/(T_sam*adc_cycle);
+    }
 
-      if (adc_phase > 180)
-      {
-        adc_phase = -1*(adc_phase - 180);
-      }
-
-      phase1_amplitude = (adc_amplitude/4096.0)*3.3;
-      phase1_freq = 1/(T_sam*adc_cycle);
-      phase1_phase = adc_phase;
+    adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
+    if (adc_phase > 180) adc_phase = -1*(adc_phase - 180);
+    phase1_phase = adc_phase;
   }
+
+  adc_amplitude = (float)(adc_max - adc_min);
+  phase1_amplitude = (adc_amplitude/4096.0)*3.3;
 
   adc_error_clear();
 }
