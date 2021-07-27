@@ -1,5 +1,6 @@
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
+#include "math.h"
 
 // Functions that will be run from RAM need to be assigned to
 // a different section.  This section will then be mapped using
@@ -219,7 +220,7 @@ void main(void)
 
   initTimer();
 
-  //initMyAdc();
+  initMyAdc();
 
   for(;;)
   {
@@ -595,7 +596,7 @@ __interrupt void adc1_isr(void)
   return;
 }
 
-#define adc_cycle_buffer_size 12
+#define adc_cycle_buffer_size 24
 int adc_cycle_counter = 0;
 int adc_cycle_buffer[adc_cycle_buffer_size];
 
@@ -643,7 +644,7 @@ void adc_calculate(void)
         }
         adc_cycle = (adc_cycle/adc_cycle_buffer_size)*2;
         if (adc_cycle < 0) adc_cycle *= -1;
-        phase1_freq = 1/(T_sam*adc_cycle);
+        phase1_freq = roundf(1/(T_sam*adc_cycle));
     }
 
     adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
