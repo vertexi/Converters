@@ -477,7 +477,7 @@ void InitEPwm2Example()
 
   // Setup TBCLK
   EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-  EPwm2Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+  EPwm2Regs.TBCTL.bit.PHSEN = TB_ENABLE;        // Disable phase loading
   EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
   EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
@@ -513,7 +513,7 @@ void InitEPwm3Example()
 
   // Setup TBCLK
   EPwm3Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-  EPwm3Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+  EPwm3Regs.TBCTL.bit.PHSEN = TB_ENABLE;        // Disable phase loading
   EPwm3Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
   EPwm3Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
