@@ -54,8 +54,9 @@ void adc_calculate(void);
 
 float INIT_DUTY0; // for pwm1
 float INIT_DUTY1; // for pwm2 initialize in main()
-#define INIT_PI0 0.1; // for pwm1+pwm2
+#define INIT_PI0 20; // for pwm1+pwm2
 #define INIT_PI1 1; // for pwm1/pwm2
+float DUTY_HIGH = 80;
 float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
@@ -167,6 +168,8 @@ void main(void)
     spwm_c[i] = 0;
     //ADC2[i] = 0;
   }
+//  INIT_DUTY0 = spwm_table[0];
+//  INIT_DUTY1 = spwm_table[0];
   spwm_counter1 = 0;
   spwm_counter2 = spwm_size/3;
   spwm_counter3 = spwm_size*2/3;
@@ -175,8 +178,6 @@ void main(void)
 
   error_list0[2] = INIT_PI0;
   error_list1[2] = INIT_PI1;
-
-  spwm_coff = INIT_PI0;
 
   // Step 1. Initialize System Control:
   // PLL, WatchDog, enable Peripheral Clocks
@@ -440,10 +441,10 @@ void InitEPwm1Example()
   EPwm1Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
   EPwm1Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
-//  EPwm1Regs.CMPCTL.bit.SHDWAMODE = CC_SHADOW;    // Load registers every ZERO
-//  EPwm1Regs.CMPCTL.bit.SHDWBMODE = CC_SHADOW;
-//  EPwm1Regs.CMPCTL.bit.LOADAMODE = CC_CTR_ZERO;
-//  EPwm1Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
+  EPwm1Regs.CMPCTL.bit.SHDWAMODE = CC_SHADOW;    // Load registers every ZERO
+  EPwm1Regs.CMPCTL.bit.SHDWBMODE = CC_SHADOW;
+  EPwm1Regs.CMPCTL.bit.LOADAMODE = CC_CTR_ZERO;
+  EPwm1Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
 
   // Setup compare
   EPwm1Regs.CMPA.half.CMPA = spwm_table[spwm_counter1];
@@ -659,8 +660,6 @@ void adc_calculate(void)
 
 float P_error0 = 0;
 float I_error0 = 0;
-float PI0_HILIMIT = 1;
-float PI0_LOLIMIT = 0.1;
 void get_PI_signal0(float *error_list)
 {
   // error_list[1]  current error
@@ -681,10 +680,10 @@ void get_PI_signal0(float *error_list)
 
   error_list[0] = error_list[1];
 
-  if (error_list[2] > PI0_HILIMIT && error_list[1] > 0)
+  if (error_list[2] > DUTY_HIGH*2 && error_list[1] > 0)
   {
     I_en = 0;
-  }else if (error_list[2] < PI0_LOLIMIT && error_list[1] < 0)
+  }else if (error_list[2] < 3 && error_list[1] < 0)
   {
     I_en = 0;
   }else
@@ -692,7 +691,7 @@ void get_PI_signal0(float *error_list)
     I_en = 1;
   }
 
-  if (error_list[2] > PI0_HILIMIT)
+  if (error_list[2] > DUTY_HIGH*2)
   {
     if (first_flag < 50)
     {
@@ -700,11 +699,11 @@ void get_PI_signal0(float *error_list)
       first_flag = 55;
     } else
     {
-      error_list[2] = PI0_HILIMIT;
+      error_list[2] = DUTY_HIGH*2;
     }
-  } else if (error_list[2] < PI0_LOLIMIT)
+  } else if (error_list[2] < 3)
   {
-    error_list[2] = PI0_LOLIMIT;
+    error_list[2] = 3;
   }
 
   return;
