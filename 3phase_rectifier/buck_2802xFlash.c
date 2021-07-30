@@ -7,7 +7,9 @@
 // the linker cmd file.
 #pragma CODE_SECTION(epwm1_isr, "ramfuncs");
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
-#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
+#pragma CODE_SECTION(adc_calculate, "ramfuncs");
+#pragma CODE_SECTION(adc_error_clear, "ramfuncs");
+//#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 //#pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
 
 // Function Prototypes
@@ -176,7 +178,7 @@ float adc_cycle = 0;
 float adc_phase = 0;
 
 float phase1_amplitude = 0;
-float phase1_freq = 0;
+float phase1_freq = 50;
 float phase1_phase = 0;
 
 uint16_t phase_shift = 0;
@@ -257,13 +259,14 @@ void main(void)
     if (adc_cal == 1)
     {
       adc_calculate();
+      adc_cal = 0;
     }
 
     if (freq_chan == 1)
     {
-        //want_freq = phase1_freq;
-        //freq_changer();
-        //spwm_coff = spwm_div * spwm_scaler;
+        want_freq = phase1_freq;
+        freq_changer();
+        spwm_coff = spwm_div * spwm_scaler;
 
         //phase_changer();
 
@@ -433,18 +436,6 @@ __interrupt void epwm1_isr(void)
 {
   EPwm1TimerIntCount++;
 
-  if (phase_chan == 1)
-  {
-    spwm_counter1 += phase_shift;
-    if (spwm_counter1 > spwm_size-1) spwm_counter1 -= spwm_size;
-    spwm_counter2 += phase_shift;
-    if (spwm_counter2 > spwm_size-1) spwm_counter2 -= spwm_size;
-    spwm_counter3 += phase_shift;
-    if (spwm_counter3 > spwm_size-1) spwm_counter3 -= spwm_size;
-
-    phase_chan = 0;
-  }
-
   (spwm_counter1 == spwm_size-1) ? (spwm_counter1 = 0) : (spwm_counter1++);
   EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter1];
 
@@ -461,29 +452,6 @@ __interrupt void epwm1_isr(void)
   // Acknowledge this interrupt to receive more interrupts from group 3
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
 }
-
-// epwm2_isr -
-//__interrupt void epwm2_isr(void)
-//{
-//
-//
-//  // Clear INT flag for this timer
-//  EPwm2Regs.ETCLR.bit.INT = 1;
-//
-//  // Acknowledge this interrupt to receive more interrupts from group 3
-//  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-//}
-
-// epwm2_isr -
-//__interrupt void epwm3_isr(void)
-//{
-//
-//  // Clear INT flag for this timer
-//  EPwm3Regs.ETCLR.bit.INT = 1;
-//
-//  // Acknowledge this interrupt to receive more interrupts from group 3
-//  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-//}
 
 // InitEPwm1Example -
 void InitEPwm1Example()
@@ -611,23 +579,20 @@ void adc_error_clear(void)
   adc_max_index = 0;
   adc_min_index = 0;
   //adc_max_spwm = 0;
-  adc_cal = 0;
-
-  ConversionCount = 0;
 }
 
 uint16_t phase_change_counter = 0;
-uint16_t phase_change_period = 40;
+//uint16_t phase_change_period = 40;
 uint16_t adc_max_n1 = 4096;
 uint16_t adc_max_n2 = 4096;
 int16_t adc_buffer = 0;
-
+int16_t phase_shift_cal = 0;
 __interrupt void adc1_isr(void)
 {
   adc_buffer = AdcResult.ADCRESULT1;
   spwm_c[ConversionCount] = CpuTimer1.InterruptCount;
   ADC1[ConversionCount] = adc_buffer;
-  (ConversionCount == sample_size-1) ? (adc_cal = 1) : (ConversionCount++);
+  (ConversionCount == sample_size-1) ? (adc_cal = 1,ConversionCount = 0) : (ConversionCount++);
 
   if (adc_max < adc_buffer)
   {
@@ -638,11 +603,14 @@ __interrupt void adc1_isr(void)
   {
     if (adc_max_n1 <= adc_buffer && adc_buffer >= adc_max_n2)
     {
-        spwm_counter1 = spwm0_0;
-        spwm_counter2 = spwm1_0;
-        spwm_counter3 = spwm2_0;
+//        if (ADC1[ConversionCount-1]>ADC1[ConversionCount-2] &&
+//            ADC1[ConversionCount-2]>ADC1[ConversionCount-3]){}
+      //phase_shift_cal = (want_freq-50)*2*spwm_size/360;
+      spwm_counter1 = spwm0_0+phase_shift_cal;
+      spwm_counter2 = spwm1_0+phase_shift_cal;
+      spwm_counter3 = spwm2_0+phase_shift_cal;
 
-        phase_change_counter = phase_change_period;
+      phase_change_counter = 1000000/ADC_PERIOD/want_freq;
     }
   }
 
@@ -672,13 +640,13 @@ void adc_calculate(void)
 
   for ( ;i >= 2; i--)
   {
-    if ((ADC1[i] - ADC1[i-1])>=0 && (ADC1[i] - ADC1[i-2])>=0 &&
-        (ADC1[i] - ADC1[i+1])>=0 && (ADC1[i] - ADC1[i+2])>=0)
+    if (ADC1[i] >= ADC1[i-1] && ADC1[i-1] >= ADC1[i-2] &&
+        ADC1[i] >= ADC1[i+1] && ADC1[i+1] >= ADC1[i+2])
     {
       adc_max_index = i;
       adc_max_spwm = spwm_c[i];
-      adc_max_n1 = ADC1[i-1];
-      adc_max_n2 = ADC1[i+1];
+      adc_max_n1 = ADC1[i-2];
+      adc_max_n2 = ADC1[i+2];
       max_search = 1;
       break;
     }
@@ -687,9 +655,10 @@ void adc_calculate(void)
   for ( ;i >= 2; i--)
   {
 
-    if ((ADC1[i] < adc_max) && (ADC1[i] - ADC1[i-1])<=0 && (ADC1[i] - ADC1[i-2])<=0 &&
-        (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 && (adc_max_index - i)>10 && (adc_max_index - i)<30)
+    if (ADC1[i] < adc_max && ADC1[i] <= ADC1[i-1] && ADC1[i-1] <= ADC1[i-2] &&
+        ADC1[i] <= ADC1[i+1] && ADC1[i+1] <= ADC1[i+2] && (adc_max_index - i)>10 && (adc_max_index - i)<30)
     {
+      adc_min = ADC1[i];
       adc_min_index = i;
       min_search = 1;
       break;
@@ -712,10 +681,6 @@ void adc_calculate(void)
         if (adc_cycle < 0) adc_cycle *= -1;
         phase1_freq = roundf(1/(T_sam*adc_cycle));
     }
-
-//    adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
-//    if (adc_phase > 180) adc_phase = -1*(adc_phase - 180);
-//    phase1_phase = adc_phase;
   }
 
   adc_amplitude = (float)(adc_max - adc_min);
@@ -816,19 +781,4 @@ void freq_changer()
     EPwm3Regs.TBPRD = PRD;
 
     spwm_scaler = PRD/2400.0;
-}
-
-uint32_t current_time;
-uint32_t delta_time;
-uint32_t time_shift;
-
-void phase_changer()
-{
-    current_time = CpuTimer1.InterruptCount;
-    delta_time = current_time - adc_max_spwm;
-
-    time_shift = delta_time % (1000000/(want_freq*100));
-    phase_shift = spwm_size*((float)(time_shift)/(1000000/(want_freq*100))+0.25);
-
-    phase_chan = 1;
 }
