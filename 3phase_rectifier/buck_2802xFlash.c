@@ -25,7 +25,7 @@ __interrupt void epwm2_isr(void);
 __interrupt void epwm3_isr(void);
 
 // Globals
-uint32_t  EPwm1TimerIntCount;
+uint32_t EPwm1TimerIntCount;
 uint16_t ConversionCount;
 
 // Defines for the maximum Dead Band values
@@ -62,10 +62,9 @@ float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
 #define sample_size 70
-//uint16_t ADC0[sample_size] = {0};
+int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
-//uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
-uint32_t spwm_c[sample_size] = {0};
+int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
 float ADC0_slope = 1.0413;
 float ADC0_intercept = -0.0003;
@@ -171,7 +170,6 @@ int16_t adc_max = 0;
 uint16_t adc_min = 5000;
 int16_t adc_max_index = 0;
 int16_t adc_min_index = 0;
-uint32_t adc_max_spwm = 0;
 
 float adc_amplitude = 0;
 float adc_cycle = 0;
@@ -196,7 +194,6 @@ void main(void)
   {
     //ADC0[i] = 0;
     ADC1[i] = 0;
-    spwm_c[i] = 0;
     //ADC2[i] = 0;
   }
   spwm_counter1 = spwm0_0;
@@ -425,9 +422,9 @@ void initMyAdc()
 
   // 设置采样时钟窗口
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
-  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 6;
-  AdcRegs.ADCSOC1CTL.bit.ACQPS  = 6;
-  AdcRegs.ADCSOC2CTL.bit.ACQPS  = 6;
+  AdcRegs.ADCSOC0CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC1CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC2CTL.bit.ACQPS  = 11;
   EDIS;
 }
 
@@ -572,13 +569,11 @@ void adc_error_clear(void)
   for (i = 0; i < sample_size; i++)
   {
     ADC1[i] = 0;
-    spwm_c[i] = 0;
   }
   adc_max = 0;
   adc_min = 5000;
   adc_max_index = 0;
   adc_min_index = 0;
-  //adc_max_spwm = 0;
 }
 
 uint16_t phase_change_counter = 0;
@@ -590,7 +585,6 @@ int16_t phase_shift_cal = 0;
 __interrupt void adc1_isr(void)
 {
   adc_buffer = AdcResult.ADCRESULT1;
-  spwm_c[ConversionCount] = CpuTimer1.InterruptCount;
   ADC1[ConversionCount] = adc_buffer;
   (ConversionCount == sample_size-1) ? (adc_cal = 1,ConversionCount = 0) : (ConversionCount++);
 
@@ -644,7 +638,6 @@ void adc_calculate(void)
         ADC1[i] >= ADC1[i+1] && ADC1[i+1] >= ADC1[i+2])
     {
       adc_max_index = i;
-      adc_max_spwm = spwm_c[i];
       adc_max_n1 = ADC1[i-2];
       adc_max_n2 = ADC1[i+2];
       max_search = 1;
