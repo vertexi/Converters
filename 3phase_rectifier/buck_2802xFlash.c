@@ -63,7 +63,7 @@ float error_list1[3] = {0,0,0};
 //uint16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 //uint16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
-uint16_t spwm_c[sample_size] = {0};
+uint32_t spwm_c[sample_size] = {0};
 
 float ADC0_slope = 1.0413;
 float ADC0_intercept = -0.0003;
@@ -103,60 +103,84 @@ float P_arg1 = 0.1;
 float I_arg1 = 150;
 
 #define spwm_size 250
-uint16_t spwm_table[spwm_size] = {1094 , 1121 , 1148 , 1175 , 1202 , 1229 ,
-  1256 , 1282 , 1309 , 1335 , 1362 , 1388 ,
-  1414 , 1439 , 1465 , 1490 , 1515 , 1540 ,
-  1564 , 1588 , 1612 , 1636 , 1659 , 1681 ,
-  1704 , 1726 , 1747 , 1768 , 1789 , 1809 ,
-  1829 , 1848 , 1867 , 1886 , 1903 , 1921 ,
-  1937 , 1954 , 1969 , 1985 , 1999 , 2013 ,
-  2026 , 2039 , 2051 , 2063 , 2074 , 2084 ,
-  2094 , 2103 , 2111 , 2119 , 2126 , 2132 ,
-  2138 , 2143 , 2148 , 2151 , 2155 , 2157 ,
-  2159 , 2160 , 2160 , 2160 , 2159 , 2157 ,
-  2155 , 2151 , 2148 , 2143 , 2138 , 2132 ,
-  2126 , 2119 , 2111 , 2103 , 2094 , 2084 ,
-  2074 , 2063 , 2051 , 2039 , 2026 , 2013 ,
-  1999 , 1985 , 1969 , 1954 , 1937 , 1921 ,
-  1903 , 1886 , 1867 , 1848 , 1829 , 1809 ,
-  1789 , 1768 , 1747 , 1726 , 1704 , 1681 ,
-  1659 , 1636 , 1612 , 1588 , 1564 , 1540 ,
-  1515 , 1490 , 1465 , 1439 , 1414 , 1388 ,
-  1362 , 1335 , 1309 , 1282 , 1256 , 1229 ,
-  1202 , 1175 , 1148 , 1121 , 1094 , 1066 ,
-  1039 , 1012 , 985  , 958  , 931  , 904  ,
-  878  , 851  , 825  , 798  , 772  , 746  ,
-  721  , 695  , 670  , 645  , 620  , 596  ,
-  572  , 548  , 524  , 501  , 479  , 456  ,
-  434  , 413  , 392  , 371  , 351  , 331  ,
-  312  , 293  , 274  , 257  , 239  , 223  ,
-  206  , 191  , 175  , 161  , 147  , 134  ,
-  121  , 109  , 97   , 86   , 76   , 66   ,
-  57   , 49   , 41   , 34   , 28   , 22   ,
-  17   , 12   , 9    , 5    , 3    , 1    ,
-  0    , 0    , 0    , 1    , 3    , 5    ,
-  9    , 12   , 17   , 22   , 28   , 34   ,
-  41   , 49   , 57   , 66   , 76   , 86   ,
-  97   , 109  , 121  , 134  , 147  , 161  ,
-  175  , 191  , 206  , 223  , 239  , 257  ,
-  274  , 293  , 312  , 331  , 351  , 371  ,
-  392  , 413  , 434  , 456  , 479  , 501  ,
-  524  , 548  , 572  , 596  , 620  , 645  ,
-  670  , 695  , 721  , 746  , 772  , 798  ,
-  825  , 851  , 878  , 904  , 931  , 958  ,
-  985  , 1012 , 1039 , 1066};
+uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,
+                                  2146 , 2141 , 2135 , 2129 , 2123 , 2115 ,
+                                  2107 , 2098 , 2089 , 2079 , 2068 , 2057 ,
+                                  2045 , 2033 , 2020 , 2006 , 1992 , 1977 ,
+                                  1962 , 1946 , 1929 , 1912 , 1895 , 1876 ,
+                                  1858 , 1839 , 1819 , 1799 , 1779 , 1758 ,
+                                  1737 , 1715 , 1693 , 1670 , 1647 , 1624 ,
+                                  1600 , 1576 , 1552 , 1528 , 1503 , 1478 ,
+                                  1452 , 1427 , 1401 , 1375 , 1349 , 1322 ,
+                                  1296 , 1269 , 1242 , 1215 , 1188 , 1161 ,
+                                  1134 , 1107 , 1080 , 1053 , 1026 , 999  ,
+                                  972  , 945  , 918  , 891  , 864  , 838  ,
+                                  811  , 785  , 759  , 733  , 708  , 682  ,
+                                  657  , 632  , 608  , 584  , 560  , 536  ,
+                                  513  , 490  , 467  , 445  , 423  , 402  ,
+                                  381  , 361  , 341  , 321  , 302  , 284  ,
+                                  265  , 248  , 231  , 214  , 198  , 183  ,
+                                  168  , 154  , 140  , 127  , 115  , 103  ,
+                                  92   , 81   , 71   , 62   , 53   , 45   ,
+                                  37   , 31   , 25   , 19   , 14   , 10   ,
+                                  7    , 4    , 2    , 1    , 0    , 0    ,
+                                  1    , 2    , 4    , 7    , 10   , 14   ,
+                                  19   , 25   , 31   , 37   , 45   , 53   ,
+                                  62   , 71   , 81   , 92   , 103  , 115  ,
+                                  127  , 140  , 154  , 168  , 183  , 198  ,
+                                  214  , 231  , 248  , 265  , 284  , 302  ,
+                                  321  , 341  , 361  , 381  , 402  , 423  ,
+                                  445  , 467  , 490  , 513  , 536  , 560  ,
+                                  584  , 608  , 632  , 657  , 682  , 708  ,
+                                  733  , 759  , 785  , 811  , 838  , 864  ,
+                                  891  , 918  , 945  , 972  , 999  , 1026 ,
+                                  1053 , 1080 , 1107 , 1134 , 1161 , 1188 ,
+                                  1215 , 1242 , 1269 , 1296 , 1322 , 1349 ,
+                                  1375 , 1401 , 1427 , 1452 , 1478 , 1503 ,
+                                  1528 , 1552 , 1576 , 1600 , 1624 , 1647 ,
+                                  1670 , 1693 , 1715 , 1737 , 1758 , 1779 ,
+                                  1799 , 1819 , 1839 , 1858 , 1876 , 1895 ,
+                                  1912 , 1929 , 1946 , 1962 , 1977 , 1992 ,
+                                  2006 , 2020 , 2033 , 2045 , 2057 , 2068 ,
+                                  2079 , 2089 , 2098 , 2107 , 2115 , 2123 ,
+                                  2129 , 2135 , 2141 , 2146 , 2150 , 2153 ,
+                                  2156 , 2158 , 2159 , 2160};
 volatile int spwm_counter1 = 0;  // init in main
 volatile int spwm_counter2 = 0;  // init in main
 volatile int spwm_counter3 = 0;  // init in main
+
+int spwm0_0 = spwm_size/12;
+int spwm1_0 = spwm_size/3+spwm_size/12;
+int spwm2_0 = spwm_size*2/3+spwm_size/12;
+
 float spwm_coff = 1;
 float spwm_div = 1;
 uint8_t adc_cal = 0;
 uint8_t freq_chan = 0;
 void freq_changer();
+void phase_changer();
 
-uint8_t want_freq = 50.0;
+uint8_t want_freq = 50;
 uint16_t PRD = 2400;
 float spwm_scaler = 1;
+
+
+int16_t adc_max = 0;
+uint16_t adc_min = 5000;
+int16_t adc_max_index = 0;
+int16_t adc_min_index = 0;
+uint32_t adc_max_spwm = 0;
+
+float adc_amplitude = 0;
+float adc_cycle = 0;
+float adc_phase = 0;
+
+float phase1_amplitude = 0;
+float phase1_freq = 0;
+float phase1_phase = 0;
+
+uint16_t phase_shift = 0;
+uint8_t phase_chan = 0;
 
 // Main
 void main(void)
@@ -173,9 +197,9 @@ void main(void)
     spwm_c[i] = 0;
     //ADC2[i] = 0;
   }
-  spwm_counter1 = 0;
-  spwm_counter2 = spwm_size/3;
-  spwm_counter3 = spwm_size*2/3;
+  spwm_counter1 = spwm0_0;
+  spwm_counter2 = spwm1_0;
+  spwm_counter3 = spwm2_0;
   target_0 += TARGET_0_ADJ;
   target_k += TARGET_k_ADJ;
 
@@ -225,7 +249,7 @@ void main(void)
 
   initTimer();
 
-  //initMyAdc();
+  initMyAdc();
 
   for(;;)
   {
@@ -237,8 +261,12 @@ void main(void)
 
     if (freq_chan == 1)
     {
-        freq_changer();
+        //want_freq = phase1_freq;
+        //freq_changer();
         //spwm_coff = spwm_div * spwm_scaler;
+
+        //phase_changer();
+
         freq_chan = 0;
     }
   }
@@ -300,7 +328,7 @@ void initTimer()
 
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
-  ConfigCpuTimer(&CpuTimer0, 60, 5000000);
+  ConfigCpuTimer(&CpuTimer0, 60, 500000);
   ConfigCpuTimer(&CpuTimer1, 60, 100);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
@@ -404,8 +432,22 @@ void initMyAdc()
 __interrupt void epwm1_isr(void)
 {
   EPwm1TimerIntCount++;
+
+  if (phase_chan == 1)
+  {
+    spwm_counter1 += phase_shift;
+    if (spwm_counter1 > spwm_size-1) spwm_counter1 -= spwm_size;
+    spwm_counter2 += phase_shift;
+    if (spwm_counter2 > spwm_size-1) spwm_counter2 -= spwm_size;
+    spwm_counter3 += phase_shift;
+    if (spwm_counter3 > spwm_size-1) spwm_counter3 -= spwm_size;
+
+    phase_chan = 0;
+  }
+
   (spwm_counter1 == spwm_size-1) ? (spwm_counter1 = 0) : (spwm_counter1++);
   EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter1];
+
 
   (spwm_counter2 == spwm_size-1) ? (spwm_counter2 = 0) : (spwm_counter2++);
   EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter2];
@@ -556,20 +598,6 @@ void InitEPwm3Example()
   EPwm3Regs.ETPS.bit.INTPRD = ET_1ST;           // Generate INT on 3rd event
 }
 
-int16_t adc_max = 0;
-uint16_t adc_min = 5000;
-int16_t adc_max_index = 0;
-int16_t adc_min_index = 0;
-uint16_t adc_max_spwm = 0;
-
-float adc_amplitude = 0;
-float adc_cycle = 0;
-float adc_phase = 0;
-
-float phase1_amplitude = 0;
-float phase1_freq = 0;
-float phase1_phase = 0;
-
 void adc_error_clear(void)
 {
   int i;
@@ -582,21 +610,42 @@ void adc_error_clear(void)
   adc_min = 5000;
   adc_max_index = 0;
   adc_min_index = 0;
-  adc_max_spwm = 0;
+  //adc_max_spwm = 0;
   adc_cal = 0;
 
   ConversionCount = 0;
 }
 
+uint16_t phase_change_counter = 0;
+uint16_t phase_change_period = 40;
+uint16_t adc_max_n1 = 4096;
+uint16_t adc_max_n2 = 4096;
+int16_t adc_buffer = 0;
+
 __interrupt void adc1_isr(void)
 {
-  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
+  adc_buffer = AdcResult.ADCRESULT1;
+  spwm_c[ConversionCount] = CpuTimer1.InterruptCount;
+  ADC1[ConversionCount] = adc_buffer;
   (ConversionCount == sample_size-1) ? (adc_cal = 1) : (ConversionCount++);
 
-  if (adc_max < AdcResult.ADCRESULT1)
+  if (adc_max < adc_buffer)
   {
-    adc_max = AdcResult.ADCRESULT1;
+    adc_max = adc_buffer;
   }
+
+  if (phase_change_counter-- > 0)
+  {
+    if (adc_max_n1 <= adc_buffer && adc_buffer >= adc_max_n2)
+    {
+        spwm_counter1 = spwm0_0;
+        spwm_counter2 = spwm1_0;
+        spwm_counter3 = spwm2_0;
+
+        phase_change_counter = phase_change_period;
+    }
+  }
+
   if (adc_min > AdcResult.ADCRESULT1)
   {
     adc_min = AdcResult.ADCRESULT1;
@@ -628,6 +677,8 @@ void adc_calculate(void)
     {
       adc_max_index = i;
       adc_max_spwm = spwm_c[i];
+      adc_max_n1 = ADC1[i-1];
+      adc_max_n2 = ADC1[i+1];
       max_search = 1;
       break;
     }
@@ -637,7 +688,7 @@ void adc_calculate(void)
   {
 
     if ((ADC1[i] < adc_max) && (ADC1[i] - ADC1[i-1])<=0 && (ADC1[i] - ADC1[i-2])<=0 &&
-        (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 && (adc_max_index - i)>15 && (adc_max_index - i)<30)
+        (ADC1[i] - ADC1[i+1])<=0 && (ADC1[i] - ADC1[i+2])<=0 && (adc_max_index - i)>10 && (adc_max_index - i)<30)
     {
       adc_min_index = i;
       min_search = 1;
@@ -662,9 +713,9 @@ void adc_calculate(void)
         phase1_freq = roundf(1/(T_sam*adc_cycle));
     }
 
-    adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
-    if (adc_phase > 180) adc_phase = -1*(adc_phase - 180);
-    phase1_phase = adc_phase;
+//    adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
+//    if (adc_phase > 180) adc_phase = -1*(adc_phase - 180);
+//    phase1_phase = adc_phase;
   }
 
   adc_amplitude = (float)(adc_max - adc_min);
@@ -726,107 +777,6 @@ void get_PI_signal0(float *error_list)
   return;
 }
 
-//float P_error1 = 0;
-//float I_error1 = 0;
-//float pwm1_f = 0;
-//float pwm2_f = 0;
-//void get_PI_signal1(float *error_list)
-//{
-//  // error_list[1]  current error
-//  // error_list[0]  last error
-//  // error_list[2]  last PI signal
-//  static int I_en = 1;
-//  static int first_flag = 0;
-//
-//  error_list[1] = target_k*0.76528+0.21723 - adc_value3;
-//  P_error1 = P_arg1*(error_list[1] - error_list[0]);
-//  I_error1 = I_en*I_arg1*(T_sam*error_list[1]);
-//  error_list[2] = error_list[2] + P_error1 + I_error1;
-//
-//  error_list[0] = error_list[1];
-//
-//  // allocation the pwm1 & pwm2 duty
-//  float pwm2 = 0, pwm1 = 0;
-//  pwm2 = error_list0[2]/(1+error_list1[2]);
-//  pwm1 = error_list1[2]*pwm2;
-//
-//  // Integratation limitation of PI control algorithm
-//  if ((error_list[2] > 10||(pwm1 > DUTY_HIGH || pwm2 < 3)) && error_list[1] > 0)
-//  {
-//    I_en = 0;
-//  } else if ((error_list[2] < 0.1||(pwm2 > DUTY_HIGH || pwm1 < 3)) && error_list[1] < 0)
-//  {
-//    I_en = 0;
-//  } else
-//  {
-//    I_en = 1;
-//  }
-//
-//  // keep track the first time final control signal limit in 0.1~10 range
-//  if (first_flag < 50)
-//  {
-//    first_flag++;
-//  }
-//  if (error_list[2] > 10 || error_list[2] < 0.1)
-//  {
-//    if (first_flag < 50)
-//    {
-//      error_list[2] = INIT_PI1;
-//      first_flag = 55;
-//    }
-//  }
-//  // keep track the first time pwm duty in 3~96 range
-//  if (pwm1 > DUTY_HIGH || pwm1 < 3)
-//  {
-//    if (first_flag < 50)
-//    {
-//      pwm1 = INIT_DUTY0;
-//      first_flag = 55;
-//    }
-//  }
-//  if (pwm2 > DUTY_HIGH || pwm2 < 3)
-//  {
-//    if (first_flag < 50)
-//    {
-//      pwm2 = INIT_DUTY1;
-//      first_flag = 55;
-//    }
-//  }
-//
-//  // limitation the actual PI signal output
-//  if (error_list[2] > 10)
-//  {
-//    error_list[2] = 10;
-//  } else if (error_list[2] < 0.1)
-//  {
-//    error_list[2] = 0.1;
-//  }
-//
-//  // limitation the proportion pwm duty
-//  if (pwm1 > DUTY_HIGH)
-//  {
-//    pwm1 = DUTY_HIGH;
-//  }
-//  if (pwm2 > DUTY_HIGH)
-//  {
-//    pwm2 = DUTY_HIGH;
-//  }
-//  if (pwm1 < 3)
-//  {
-//    pwm1 = 3;
-//  }
-//  if (pwm2 < 3)
-//  {
-//    pwm2 = 3;
-//  }
-//
-//  pwm1_f = pwm1;
-//  pwm2_f = pwm2;
-//  EPwm1Regs.CMPA.half.CMPA = EPWM1_PRD-pwm1_f/100*EPWM1_PRD;
-//  EPwm2Regs.CMPA.half.CMPA = EPWM1_PRD-pwm2_f/100*EPWM1_PRD;
-//  return;
-//}
-
 // cpu_timer0_isr -
 __interrupt void cpu_timer0_isr(void)
 {
@@ -850,7 +800,6 @@ __interrupt void cpu_timer1_isr(void)
 // cpu_timer2_isr -
 __interrupt void cpu_timer2_isr(void)
 {
-  spwm_c[ConversionCount] = spwm_counter1;
   EALLOW;
   CpuTimer2.InterruptCount++;
 
@@ -858,14 +807,28 @@ __interrupt void cpu_timer2_isr(void)
   EDIS;
 }
 
-
 void freq_changer()
 {
     //(want_freq == 60) ? (want_freq = 40) : (want_freq++);
-    PRD = 60e6/(spwm_size*2*want_freq);
+    PRD = 60000000/(spwm_size*2)/want_freq;
     EPwm1Regs.TBPRD = PRD;
     EPwm2Regs.TBPRD = PRD;
     EPwm3Regs.TBPRD = PRD;
 
     spwm_scaler = PRD/2400.0;
+}
+
+uint32_t current_time;
+uint32_t delta_time;
+uint32_t time_shift;
+
+void phase_changer()
+{
+    current_time = CpuTimer1.InterruptCount;
+    delta_time = current_time - adc_max_spwm;
+
+    time_shift = delta_time % (1000000/(want_freq*100));
+    phase_shift = spwm_size*((float)(time_shift)/(1000000/(want_freq*100))+0.25);
+
+    phase_chan = 1;
 }
