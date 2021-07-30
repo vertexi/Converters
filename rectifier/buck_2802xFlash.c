@@ -150,7 +150,13 @@ volatile int spwm_counter1 = 0;  // init in main
 volatile int spwm_counter2 = 0;  // init in main
 volatile int spwm_counter3 = 0;  // init in main
 float spwm_coff = 1;
+float spwm_scaler = 1;
 uint8_t adc_cal = 0;
+uint8_t freq_chan = 0;
+
+float want_freq = 50;
+
+void change_freq(float set_freq);
 
 
 // Main
@@ -229,6 +235,13 @@ void main(void)
     {
       adc_calculate();
     }
+
+    if (freq_chan == 1)
+    {
+      change_freq(want_freq);
+      (want_freq == 60) ? (want_freq = 40) : (want_freq++);
+      freq_chan = 0;
+    }
   }
 }
 
@@ -288,8 +301,8 @@ void initTimer()
 
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
-  ConfigCpuTimer(&CpuTimer0, 60, 1000000);
-  ConfigCpuTimer(&CpuTimer1, 60, 100);
+  ConfigCpuTimer(&CpuTimer0, 60, 5000000);
+  ConfigCpuTimer(&CpuTimer1, 60, 1000000);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
   // To ensure precise timing, use write-only instructions to write to the
@@ -393,7 +406,7 @@ __interrupt void epwm1_isr(void)
 {
   EPwm1TimerIntCount++;
   (spwm_counter1 == spwm_size-1) ? (spwm_counter1 = 0) : (spwm_counter1++);
-  EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter1];
+  EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_scaler*spwm_table[spwm_counter1];
 
   // Clear INT flag for this timer
   EPwm1Regs.ETCLR.bit.INT = 1;
@@ -406,7 +419,7 @@ __interrupt void epwm1_isr(void)
 __interrupt void epwm2_isr(void)
 {
   (spwm_counter2 == spwm_size-1) ? (spwm_counter2 = 0) : (spwm_counter2++);
-  EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter2];
+  EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_scaler*spwm_table[spwm_counter2];
 
   // Clear INT flag for this timer
   EPwm2Regs.ETCLR.bit.INT = 1;
@@ -419,7 +432,7 @@ __interrupt void epwm2_isr(void)
 __interrupt void epwm3_isr(void)
 {
   (spwm_counter3 == spwm_size-1) ? (spwm_counter3 = 0) : (spwm_counter3++);
-  EPwm3Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter3];
+  EPwm3Regs.CMPA.half.CMPA = spwm_coff*spwm_scaler*spwm_table[spwm_counter3];
 
   // Clear INT flag for this timer
   EPwm3Regs.ETCLR.bit.INT = 1;
@@ -644,7 +657,7 @@ void adc_calculate(void)
         }
         adc_cycle = (adc_cycle/adc_cycle_buffer_size)*2;
         if (adc_cycle < 0) adc_cycle *= -1;
-        phase1_freq = roundf(1/(T_sam*adc_cycle));
+        phase1_freq = 1/(T_sam*adc_cycle);
     }
 
     adc_phase = ((float)(360.0/spwm_size))*adc_max_spwm-90;
@@ -825,6 +838,7 @@ __interrupt void cpu_timer1_isr(void)
 {
   CpuTimer1.InterruptCount++;
 
+//  freq_chan = 1;
   // The CPU acknowledges the interrupt
   EDIS;
 }
@@ -838,4 +852,15 @@ __interrupt void cpu_timer2_isr(void)
 
   // The CPU acknowledges the interrupt.
   EDIS;
+}
+
+void change_freq(float set_freq)
+{
+    float PRD = 60e6/(250*2*set_freq);
+
+    EPwm1Regs.TBPRD = PRD;
+    EPwm2Regs.TBPRD = PRD;
+    EPwm3Regs.TBPRD = PRD;
+
+    spwm_scaler = PRD/2400;
 }

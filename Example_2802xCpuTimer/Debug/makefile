@@ -137,6 +137,12 @@ Example_2802xCpuTimer.out \
 EXE_OUTPUTS__QUOTED += \
 "Example_2802xCpuTimer.out" \
 
+BIN_OUTPUTS += \
+Example_2802xCpuTimer.hex \
+
+BIN_OUTPUTS__QUOTED += \
+"Example_2802xCpuTimer.hex" \
+
 
 # All Target
 all: Example_2802xCpuTimer.out
@@ -145,13 +151,20 @@ all: Example_2802xCpuTimer.out
 Example_2802xCpuTimer.out: $(OBJS) $(CMD_SRCS) $(LIB_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: C2000 Linker'
-	"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/bin/cl2000" -v28 -ml -mt -g --define="_DEBUG" --define="LARGE_MODEL" --quiet --verbose_diagnostics --diag_warning=225 --diag_suppress=232 --diag_suppress=10063 --issue_remarks -z -m"Example_2802xCpuTimer.map" --stack_size=0x200 --warn_sections -i"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/lib" -i"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/include" -i"C:/Users/Apoptosis/workspace_v10/Example_2802xCpuTimer" -i"C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/lib" -i"C:/Users/Apoptosis/Documents/GitHub/libraries/math/IQmath/c28/lib" --reread_libs --verbose_diagnostics --issue_remarks --xml_link_info="Example_2802xCpuTimer_linkInfo.xml" --entry_point=code_start --rom_model -o "Example_2802xCpuTimer.out" $(ORDERED_OBJS)
+	"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/bin/cl2000" -v28 -ml -mt --define=_DEBUG --define=LARGE_MODEL -g --diag_suppress=232 --diag_suppress=10063 --diag_warning=225 --issue_remarks --verbose_diagnostics --quiet --abi=coffabi -z -m"Example_2802xCpuTimer.map" --stack_size=0x200 --warn_sections -i"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/lib" -i"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/include" -i"C:/Users/Apoptosis/workspace_v10/Example_2802xCpuTimer" -i"C:/Users/Apoptosis/Documents/GitHub/electronics_tryout/f2802x/common/lib" -i"C:/Users/Apoptosis/Documents/GitHub/libraries/math/IQmath/c28/lib" --reread_libs --issue_remarks --verbose_diagnostics --xml_link_info="Example_2802xCpuTimer_linkInfo.xml" --entry_point=code_start --rom_model -o "Example_2802xCpuTimer.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
+	@echo ' '
+
+Example_2802xCpuTimer.hex: $(EXE_OUTPUTS)
+	@echo 'Building files: $(strip $(EXE_OUTPUTS__QUOTED))'
+	@echo 'Invoking: C2000 Hex Utility'
+	"C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-c2000_20.2.1.LTS/bin/hex2000"  -o "Example_2802xCpuTimer.hex" $(EXE_OUTPUTS__QUOTED)
+	@echo 'Finished building: $(strip $(EXE_OUTPUTS__QUOTED))'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXE_OUTPUTS__QUOTED)
+	-$(RM) $(BIN_OUTPUTS__QUOTED)$(EXE_OUTPUTS__QUOTED)
 	-$(RM) "Example_2802xCpuTimer.obj" "F2802x_GlobalVariableDefs.obj" "f2802x_codestartbranch.obj" "f2802x_cputimers.obj" "f2802x_defaultisr.obj" "f2802x_piectrl.obj" "f2802x_pievect.obj" "f2802x_sysctrl.obj" "f2802x_usdelay.obj" 
 	-$(RM) "Example_2802xCpuTimer.d" "F2802x_GlobalVariableDefs.d" "f2802x_cputimers.d" "f2802x_defaultisr.d" "f2802x_piectrl.d" "f2802x_pievect.d" "f2802x_sysctrl.d" 
 	-$(RM) "f2802x_codestartbranch.d" "f2802x_usdelay.d" 

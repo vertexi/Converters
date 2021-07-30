@@ -149,8 +149,14 @@ volatile int spwm_counter1 = 0;  // init in main
 volatile int spwm_counter2 = 0;  // init in main
 volatile int spwm_counter3 = 0;  // init in main
 float spwm_coff = 1;
+float spwm_div = 1;
 uint8_t adc_cal = 0;
+uint8_t freq_chan = 0;
+void freq_changer();
 
+uint8_t want_freq = 50.0;
+uint16_t PRD = 2400;
+float spwm_scaler = 1;
 
 // Main
 void main(void)
@@ -228,6 +234,13 @@ void main(void)
     {
       adc_calculate();
     }
+
+    if (freq_chan == 1)
+    {
+        freq_changer();
+        //spwm_coff = spwm_div * spwm_scaler;
+        freq_chan = 0;
+    }
   }
 }
 
@@ -238,8 +251,8 @@ void initPWM()
   // ISR functions found within this file.
   EALLOW;            // This is needed to write to EALLOW protected registers
   PieVectTable.EPWM1_INT = &epwm1_isr;
-  PieVectTable.EPWM2_INT = &epwm2_isr;
-  PieVectTable.EPWM3_INT = &epwm3_isr;
+  //PieVectTable.EPWM2_INT = &epwm2_isr;
+  //PieVectTable.EPWM3_INT = &epwm3_isr;
   EDIS;      // This is needed to disable write to EALLOW protected registers
 
   // Step 4. Initialize all the Device Peripherals:
@@ -265,8 +278,8 @@ void initPWM()
 
   // Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
   PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
-  PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
-  PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
+  //PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
+  //PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
 }
 
 void initTimer()
@@ -287,7 +300,7 @@ void initTimer()
 
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
-  ConfigCpuTimer(&CpuTimer0, 60, 1000000);
+  ConfigCpuTimer(&CpuTimer0, 60, 5000000);
   ConfigCpuTimer(&CpuTimer1, 60, 100);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
@@ -394,6 +407,12 @@ __interrupt void epwm1_isr(void)
   (spwm_counter1 == spwm_size-1) ? (spwm_counter1 = 0) : (spwm_counter1++);
   EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter1];
 
+  (spwm_counter2 == spwm_size-1) ? (spwm_counter2 = 0) : (spwm_counter2++);
+  EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter2];
+
+  (spwm_counter3 == spwm_size-1) ? (spwm_counter3 = 0) : (spwm_counter3++);
+  EPwm3Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter3];
+
   // Clear INT flag for this timer
   EPwm1Regs.ETCLR.bit.INT = 1;
 
@@ -402,30 +421,27 @@ __interrupt void epwm1_isr(void)
 }
 
 // epwm2_isr -
-__interrupt void epwm2_isr(void)
-{
-  (spwm_counter2 == spwm_size-1) ? (spwm_counter2 = 0) : (spwm_counter2++);
-  EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter2];
-
-  // Clear INT flag for this timer
-  EPwm2Regs.ETCLR.bit.INT = 1;
-
-  // Acknowledge this interrupt to receive more interrupts from group 3
-  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-}
+//__interrupt void epwm2_isr(void)
+//{
+//
+//
+//  // Clear INT flag for this timer
+//  EPwm2Regs.ETCLR.bit.INT = 1;
+//
+//  // Acknowledge this interrupt to receive more interrupts from group 3
+//  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
+//}
 
 // epwm2_isr -
-__interrupt void epwm3_isr(void)
-{
-  (spwm_counter3 == spwm_size-1) ? (spwm_counter3 = 0) : (spwm_counter3++);
-  EPwm3Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter3];
-
-  // Clear INT flag for this timer
-  EPwm3Regs.ETCLR.bit.INT = 1;
-
-  // Acknowledge this interrupt to receive more interrupts from group 3
-  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-}
+//__interrupt void epwm3_isr(void)
+//{
+//
+//  // Clear INT flag for this timer
+//  EPwm3Regs.ETCLR.bit.INT = 1;
+//
+//  // Acknowledge this interrupt to receive more interrupts from group 3
+//  PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
+//}
 
 // InitEPwm1Example -
 void InitEPwm1Example()
@@ -815,6 +831,7 @@ void get_PI_signal0(float *error_list)
 __interrupt void cpu_timer0_isr(void)
 {
   CpuTimer0.InterruptCount++;
+  freq_chan = 1;
 
   // Acknowledge this interrupt to receive more interrupts from group 1
   //Gpio_example1();
@@ -839,4 +856,16 @@ __interrupt void cpu_timer2_isr(void)
 
   // The CPU acknowledges the interrupt.
   EDIS;
+}
+
+
+void freq_changer()
+{
+    //(want_freq == 60) ? (want_freq = 40) : (want_freq++);
+    PRD = 60e6/(spwm_size*2*want_freq);
+    EPwm1Regs.TBPRD = PRD;
+    EPwm2Regs.TBPRD = PRD;
+    EPwm3Regs.TBPRD = PRD;
+
+    spwm_scaler = PRD/2400.0;
 }
