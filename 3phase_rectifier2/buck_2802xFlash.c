@@ -174,6 +174,7 @@ int16_t adc0_max = 0;
 int16_t adc2_max = 0;
 
 int16_t adc0_max_p = 0;
+int16_t adc1_max_p = 0;
 int16_t adc2_max_p = 0;
 
 int16_t adc_max_index = 0;
@@ -594,6 +595,7 @@ void adc_error_clear(void)
   }
 
   adc0_max_p = adc0_max;
+  adc1_max_p = adc_max;
   adc2_max_p = adc2_max;
 
   adc_max = 0;
@@ -702,7 +704,8 @@ void adc_calculate(void)
 
   for ( ;i >= 2; i--)
   {
-    if (ADC1[i] >= ADC1[i-1] && ADC1[i-1] >= ADC1[i-2] &&
+    if ((adc_max - 20) <= ADC1[i] &&
+        ADC1[i] >= ADC1[i-1] && ADC1[i-1] >= ADC1[i-2] &&
         ADC1[i] >= ADC1[i+1] && ADC1[i+1] >= ADC1[i+2])
     {
       adc_max_index = i;
@@ -715,8 +718,7 @@ void adc_calculate(void)
 
   for ( ;i >= 2; i--)
   {
-
-    if (ADC1[i] < adc_max && ADC1[i] <= ADC1[i-1] && ADC1[i-1] <= ADC1[i-2] &&
+    if (ADC1[i] <= (adc_min+20) && ADC1[i] <= ADC1[i-1] && ADC1[i-1] <= ADC1[i-2] &&
         ADC1[i] <= ADC1[i+1] && ADC1[i+1] <= ADC1[i+2] && (adc_max_index - i)>10 && (adc_max_index - i)<30)
     {
       adc_min = ADC1[i];
