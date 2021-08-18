@@ -43,6 +43,7 @@ __interrupt void adc1_isr(void);
 void Adc_Config(void);
 
 void initPWM();
+void InitGPIO(void);
 void initTimer();
 void initMyAdc();
 void get_PI_signal0(float *error_list);
@@ -224,6 +225,7 @@ void main(void)
   InitPieVectTable();
 
   InitEPwm1Gpio();
+  InitGPIO();
   //InitEPwm2Gpio();
   //InitEPwm3Gpio();
 
@@ -248,6 +250,17 @@ void main(void)
       change_duty();
     }
   }
+}
+
+void InitGPIO(void)
+{
+    EALLOW;
+
+    GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;    // Disable pull-up on GPIO2
+    GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 0;   // Configure GPIO2 not as EPWM2A
+    GpioCtrlRegs.GPADIR.bit.GPIO2 = 1;    // Configure GPIO2 as output
+
+    EDIS;
 }
 
 void initPWM()
@@ -741,6 +754,13 @@ void get_PI_signal0(float *error_list)
 void change_duty(void)
 {
   EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision/100;
+  if (adc_value1 >= 0)
+  {
+      GpioDataRegs.GPACLEAR.bit.GPIO2 = 1;
+  } else
+  {
+      GpioDataRegs.GPASET.bit.GPIO2 = 1;
+  }
 }
 
 // cpu_timer0_isr -
