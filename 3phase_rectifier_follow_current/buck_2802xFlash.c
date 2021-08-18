@@ -1,5 +1,3 @@
-// This program just follow the input adc signal and generate the same phase spwm
-
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
 #include "math.h"
@@ -48,21 +46,25 @@ void initPWM();
 void initTimer();
 void initMyAdc();
 void get_PI_signal0(float *error_list);
+void change_duty(void);
+void get_adc_values(void);
 //void get_PI_signal1(float *error_list);
+
 int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
 int32_t pre_storage_adc2(void);
 void adc_error_clear(void);
 void adc_calculate(void);
 
-float INIT_DUTY0; // for pwm1
-float INIT_DUTY1; // for pwm2 initialize in main()
-#define INIT_PI0 1; // for pwm1+pwm2
-#define INIT_PI1 1; // for pwm1/pwm2
+int INIT_DUTY0 = 10; // for pwm1
+int INIT_DUTY1 = 10; // for pwm2
+int INIT_DUTY2 = 10; // for pwm2
+#define INIT_PI0 10; //
+#define INIT_PI1 1; //
 float error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
-#define sample_size 70
+#define sample_size 12
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -87,23 +89,20 @@ float intercept2 = -0.02822; //current2
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
-float adc_value0 = 0;// voltage1 47kohm/10kohm
-float adc_value1 = 0;// current1
-float adc_value2 = 0;// current2
-float adc_value3 = 0;// current1/current2
+float adc_value0 = 0; // current1
+float adc_value1 = 0; // voltage
+float adc_value2 = 0; // current2
 
 float target_0 = 8; // expect value for valtage
 float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD 2400
-#define ADC_PERIOD 500
-float T_sam = 0.000500;
-float P_arg0 = 50;
-float I_arg0 = 1000;
-float P_arg1 = 0.1;
-float I_arg1 = 150;
+#define EPWM1_PRD (600)
+#define ADC_PERIOD 100
+float T_sam = 0.000100;
+float P_arg0 = 0.1;
+float I_arg0 = 80;
 
 #define spwm_size 250
 uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,
@@ -148,27 +147,9 @@ uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,
                                   2079 , 2089 , 2098 , 2107 , 2115 , 2123 ,
                                   2129 , 2135 , 2141 , 2146 , 2150 , 2153 ,
                                   2156 , 2158 , 2159 , 2160};
-volatile int spwm_counter1 = 0;  // init in main
-volatile int spwm_counter2 = 0;  // init in main
-volatile int spwm_counter3 = 0;  // init in main
 
-int spwm0_0 = spwm_size/12;
-int spwm1_0 = spwm_size/3+spwm_size/12;
-int spwm2_0 = spwm_size*2/3+spwm_size/12;
-
-float spwm_coff = 1;
-float spwm_div = 1;
 uint8_t adc_cal = 0;
-uint8_t freq_chan = 0;
-void freq_changer();
-void pwm1_changer(void);
-void pwm0_changer(void);
-void pwm2_changer(void);
-
-uint8_t want_freq = 50;
-uint16_t PRD = 2400;
-float spwm_scaler = 1;
-
+uint8_t PID_cal = 0;
 
 int16_t adc_max = 0;
 int16_t adc_min = 5000;
@@ -190,18 +171,6 @@ float phase1_amplitude = 0;
 float phase1_freq = 50;
 float phase1_phase = 0;
 
-uint8_t phase_chan = 0;
-
-uint16_t phase_change_counter = 0;
-uint16_t phase_change_counter0 = 0;
-uint16_t phase_change_counter2 = 0;
-
-//uint16_t phase_change_period = 40;
-int16_t adc_max_n1 = 4096;
-int16_t adc_max_n2 = 4096;
-
-int16_t phase_shift_cal = 0;
-
 // Main
 void main(void)
 {
@@ -216,16 +185,10 @@ void main(void)
     ADC1[i] = 0;
     ADC2[i] = 0;
   }
-  spwm_counter1 = spwm0_0;
-  spwm_counter2 = spwm1_0;
-  spwm_counter3 = spwm2_0;
+
   target_0 += TARGET_0_ADJ;
-  target_k += TARGET_k_ADJ;
 
   error_list0[2] = INIT_PI0;
-  error_list1[2] = INIT_PI1;
-
-  spwm_coff = INIT_PI0;
 
   // Step 1. Initialize System Control:
   // PLL, WatchDog, enable Peripheral Clocks
@@ -261,8 +224,8 @@ void main(void)
   InitPieVectTable();
 
   InitEPwm1Gpio();
-  InitEPwm2Gpio();
-  InitEPwm3Gpio();
+  //InitEPwm2Gpio();
+  //InitEPwm3Gpio();
 
   initPWM();
   initTimer();
@@ -271,26 +234,18 @@ void main(void)
   for(;;)
   {
     //    __asm("          NOP");
-    if (phase_chan == 1)
-    {
-      pwm0_changer();
-      pwm1_changer();
-      pwm2_changer();
-      phase_chan = 0;
-    }
     if (adc_cal == 1)
     {
-      adc_calculate();
+      //adc_calculate();
       adc_cal = 0;
     }
 
-    if (freq_chan == 1)
+    if (PID_cal == 1)
     {
-      want_freq = phase1_freq;
-      freq_changer();
-      spwm_coff = spwm_div * spwm_scaler;
-
-      freq_chan = 0;
+      PID_cal = 0;
+      get_adc_values();
+      get_PI_signal0(error_list0);
+      change_duty();
     }
   }
 }
@@ -313,8 +268,8 @@ void initPWM()
   EDIS;
 
   InitEPwm1Example();
-  InitEPwm2Example();
-  InitEPwm3Example();
+  //InitEPwm2Example();
+  //InitEPwm3Example();
 
   EALLOW;
   SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -456,16 +411,6 @@ __interrupt void epwm1_isr(void)
 {
   EPwm1TimerIntCount++;
 
-  (spwm_counter1 == spwm_size-1) ? (spwm_counter1 = 0) : (spwm_counter1++);
-  EPwm1Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter1];
-
-
-  (spwm_counter2 == spwm_size-1) ? (spwm_counter2 = 0) : (spwm_counter2++);
-  EPwm2Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter2];
-
-  (spwm_counter3 == spwm_size-1) ? (spwm_counter3 = 0) : (spwm_counter3++);
-  EPwm3Regs.CMPA.half.CMPA = spwm_coff*spwm_table[spwm_counter3];
-
   // Clear INT flag for this timer
   EPwm1Regs.ETCLR.bit.INT = 1;
 
@@ -492,7 +437,7 @@ void InitEPwm1Example()
   EPwm1Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
 
   // Setup compare
-  EPwm1Regs.CMPA.half.CMPA = spwm_table[spwm_counter1];
+  EPwm1Regs.CMPA.half.CMPA = INIT_DUTY0*EPWM1_PRD/100;
 
   // Set actions
   EPwm1Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
@@ -528,7 +473,7 @@ void InitEPwm2Example()
   EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
   // Setup compare
-  EPwm2Regs.CMPA.half.CMPA = spwm_table[spwm_counter2];
+  EPwm2Regs.CMPA.half.CMPA = INIT_DUTY1*EPWM1_PRD/100;
 
   // Set actions
   EPwm2Regs.AQCTLA.bit.CAU = AQ_SET;             // Set PWM2A on Zero
@@ -564,7 +509,7 @@ void InitEPwm3Example()
   EPwm3Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 
   // Setup compare
-  EPwm3Regs.CMPA.half.CMPA = spwm_table[spwm_counter3];
+  EPwm3Regs.CMPA.half.CMPA = INIT_DUTY2*EPWM1_PRD/100;
 
   // Set actions
   EPwm3Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
@@ -609,14 +554,50 @@ void adc_error_clear(void)
   adc_min_index = 0;
 }
 
+int32_t pre_storage_adc0(void)
+{
+  static int32_t adc_sum0 = 0;
+  static uint8_t counter = 0;
+  adc_sum0 -= ADC0[ConversionCount];
+  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
+  adc_sum0 += AdcResult.ADCRESULT0;
+  if (counter < sample_size)
+  {
+      counter++;
+      return ((int32_t)(AdcResult.ADCRESULT0)*sample_size);
+  }
+  return adc_sum0;
+}
+
+
+int32_t pre_storage_adc1(void)
+{
+  static int32_t adc_sum1 = 0;
+  static uint8_t counter = 0;
+  adc_sum1 -= ADC1[ConversionCount];
+  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
+  adc_sum1 += AdcResult.ADCRESULT1;
+  if (counter < sample_size)
+  {
+      counter++;
+      return ((int32_t)(AdcResult.ADCRESULT1)*sample_size);
+  }
+  return adc_sum1;
+}
+
+int32_t adc_value_aver_0 = 0;
+int32_t adc_value_aver_1 = 0;
+
 __interrupt void adc1_isr(void)
 {
-  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
-  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
-  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
-  (ConversionCount == sample_size-1) ? (adc_cal = 1,ConversionCount = 0) : (ConversionCount++);
+//  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
+//  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
+//  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
+  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+  (ConversionCount == sample_size-1) ? (adc_cal = 1, ConversionCount = 0) : (ConversionCount++);
 
-  phase_chan = 1;
+  PID_cal = 1;
 
   // Clear ADCINT1 flag reinitialize for next SOC
   AdcRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
@@ -625,73 +606,6 @@ __interrupt void adc1_isr(void)
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
   return;
-}
-
-void pwm0_changer(void)
-{
-  int16_t adc_buffer = 0;
-  adc_buffer = AdcResult.ADCRESULT0;
-  if (adc0_max < adc_buffer)
-  {
-    adc0_max = adc_buffer;
-  }
-
-  if (phase_change_counter0-- > 0)
-  {
-    if ((adc0_max_p - 20) <= adc_buffer)
-    {
-      //phase_shift_cal = (want_freq-50)*2*spwm_size/360;
-      spwm_counter1 = spwm0_0+phase_shift_cal;
-      phase_change_counter0 = 1000000/ADC_PERIOD/want_freq;
-    }
-  }
-}
-
-void pwm1_changer(void)
-{
-  int16_t adc_buffer = 0;
-  adc_buffer = AdcResult.ADCRESULT1;
-  if (adc_max < adc_buffer)
-  {
-    adc_max = adc_buffer;
-  }
-
-  if (phase_change_counter-- > 0)
-  {
-    if (adc_max_n1 <= adc_buffer && adc_buffer >= adc_max_n2)
-    {
-      //        if (ADC1[ConversionCount-1]>ADC1[ConversionCount-2] &&
-      //            ADC1[ConversionCount-2]>ADC1[ConversionCount-3]){}
-      //phase_shift_cal = (want_freq-50)*2*spwm_size/360;
-      spwm_counter2 = spwm0_0+phase_shift_cal;
-      phase_change_counter = 1000000/ADC_PERIOD/want_freq;
-    }
-  }
-
-  if (adc_min > AdcResult.ADCRESULT1)
-  {
-    adc_min = AdcResult.ADCRESULT1;
-  }
-}
-
-void pwm2_changer(void)
-{
-  int16_t adc_buffer = 0;
-  adc_buffer = AdcResult.ADCRESULT2;
-  if (adc2_max < adc_buffer)
-  {
-    adc2_max = adc_buffer;
-  }
-
-  if (phase_change_counter2-- > 0)
-  {
-    if ((adc2_max_p - 20) <= adc_buffer)
-    {
-      //phase_shift_cal = (want_freq-50)*2*spwm_size/360;
-      spwm_counter3 = spwm0_0+phase_shift_cal;
-      phase_change_counter2 = 1000000/ADC_PERIOD/want_freq;
-    }
-  }
 }
 
 #define adc_cycle_buffer_size 24
@@ -711,8 +625,6 @@ void adc_calculate(void)
         ADC1[i] >= ADC1[i+1] && ADC1[i+1] >= ADC1[i+2])
     {
       adc_max_index = i;
-      adc_max_n1 = ADC1[i-2];
-      adc_max_n2 = ADC1[i+2];
       max_search = 1;
       break;
     }
@@ -754,14 +666,31 @@ void adc_calculate(void)
   adc_error_clear();
 }
 
+float voltage_k = 0.06;
+
+int32_t adc_value1_buffer[200];
+uint8_t adc_value1_counter = 0;
+void get_adc_values(void)
+{
+  adc_value1 = ((adc_value_aver_1*3300>>12)-1500)*2*10; // voltage
+
+  adc_value1_buffer[adc_value1_counter] = adc_value1;
+  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
+
+  adc_value0 = ((adc_value_aver_0*3300>>12)-1500)*2; // current
+
+  target_0 = adc_value1 * voltage_k;
+}
+
 float P_error0 = 0;
 float I_error0 = 0;
-float PI0_HILIMIT = 1;
-float PI0_LOLIMIT = 0.1;
+int PI0_HILIMIT = 90;
+int PI0_LOLIMIT = 1;
+uint32_t PI0_decision = 1;
 void get_PI_signal0(float *error_list)
 {
-  // error_list[1]  current error
   // error_list[0]  last error
+  // error_list[1]  current error
   // error_list[2]  last PI signal
   static int I_en = 1;
   static int first_flag = 0;
@@ -773,8 +702,8 @@ void get_PI_signal0(float *error_list)
 
   error_list[1] = target_0 - adc_value0;
   P_error0 = P_arg0*(error_list[1] - error_list[0]);
-  I_error0 = I_en*I_arg0*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error0 + I_error0;
+  I_error0 = I_arg0*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error0 + I_en*I_error0;
 
   error_list[0] = error_list[1];
 
@@ -804,14 +733,20 @@ void get_PI_signal0(float *error_list)
     error_list[2] = PI0_LOLIMIT;
   }
 
+  PI0_decision = error_list[2];
+
   return;
+}
+
+void change_duty(void)
+{
+  EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision/100;
 }
 
 // cpu_timer0_isr -
 __interrupt void cpu_timer0_isr(void)
 {
   CpuTimer0.InterruptCount++;
-  freq_chan = 1;
 
   // Acknowledge this interrupt to receive more interrupts from group 1
   //Gpio_example1();
@@ -835,15 +770,4 @@ __interrupt void cpu_timer2_isr(void)
 
   // The CPU acknowledges the interrupt.
   EDIS;
-}
-
-void freq_changer()
-{
-  //(want_freq == 60) ? (want_freq = 40) : (want_freq++);
-  PRD = 60000000/(spwm_size*2)/want_freq;
-  EPwm1Regs.TBPRD = PRD;
-  EPwm2Regs.TBPRD = PRD;
-  EPwm3Regs.TBPRD = PRD;
-
-  spwm_scaler = PRD/2400.0;
 }
