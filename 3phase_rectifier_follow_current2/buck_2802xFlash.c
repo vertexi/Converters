@@ -1,3 +1,5 @@
+// try use spwm table track input voltage instead of the sensor value
+
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
 #include "math.h"
