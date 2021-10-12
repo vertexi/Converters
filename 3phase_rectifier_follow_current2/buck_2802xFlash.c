@@ -11,6 +11,12 @@
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
 #pragma CODE_SECTION(adc_calculate, "ramfuncs");
 #pragma CODE_SECTION(adc_error_clear, "ramfuncs");
+#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
+#pragma CODE_SECTION(get_adc_values, "ramfuncs");
+#pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
+#pragma CODE_SECTION(pre_storage_adc1, "ramfuncs");
+#pragma CODE_SECTION(pre_storage_adc2, "ramfuncs");
+
 //#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 //#pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
 
@@ -18,6 +24,8 @@
 __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
 __interrupt void cpu_timer2_isr(void);
+__interrupt void xint1_isr(void);
+__interrupt void xint2_isr(void);
 
 void InitEPwm1Example(void);
 void InitEPwm2Example(void);
@@ -44,6 +52,7 @@ extern uint16_t RamfuncsRunStart;
 __interrupt void adc1_isr(void);
 void Adc_Config(void);
 
+void InitExternalInt(void);
 void initPWM();
 void InitGPIO(void);
 void initTimer();
@@ -109,47 +118,47 @@ float I_arg0 = 80;
 
 #define spwm_size 250
 uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,
-                                  2146 , 2141 , 2135 , 2129 , 2123 , 2115 ,
-                                  2107 , 2098 , 2089 , 2079 , 2068 , 2057 ,
-                                  2045 , 2033 , 2020 , 2006 , 1992 , 1977 ,
-                                  1962 , 1946 , 1929 , 1912 , 1895 , 1876 ,
-                                  1858 , 1839 , 1819 , 1799 , 1779 , 1758 ,
-                                  1737 , 1715 , 1693 , 1670 , 1647 , 1624 ,
-                                  1600 , 1576 , 1552 , 1528 , 1503 , 1478 ,
-                                  1452 , 1427 , 1401 , 1375 , 1349 , 1322 ,
-                                  1296 , 1269 , 1242 , 1215 , 1188 , 1161 ,
-                                  1134 , 1107 , 1080 , 1053 , 1026 , 999  ,
-                                  972  , 945  , 918  , 891  , 864  , 838  ,
-                                  811  , 785  , 759  , 733  , 708  , 682  ,
-                                  657  , 632  , 608  , 584  , 560  , 536  ,
-                                  513  , 490  , 467  , 445  , 423  , 402  ,
-                                  381  , 361  , 341  , 321  , 302  , 284  ,
-                                  265  , 248  , 231  , 214  , 198  , 183  ,
-                                  168  , 154  , 140  , 127  , 115  , 103  ,
-                                  92   , 81   , 71   , 62   , 53   , 45   ,
-                                  37   , 31   , 25   , 19   , 14   , 10   ,
-                                  7    , 4    , 2    , 1    , 0    , 0    ,
-                                  1    , 2    , 4    , 7    , 10   , 14   ,
-                                  19   , 25   , 31   , 37   , 45   , 53   ,
-                                  62   , 71   , 81   , 92   , 103  , 115  ,
-                                  127  , 140  , 154  , 168  , 183  , 198  ,
-                                  214  , 231  , 248  , 265  , 284  , 302  ,
-                                  321  , 341  , 361  , 381  , 402  , 423  ,
-                                  445  , 467  , 490  , 513  , 536  , 560  ,
-                                  584  , 608  , 632  , 657  , 682  , 708  ,
-                                  733  , 759  , 785  , 811  , 838  , 864  ,
-                                  891  , 918  , 945  , 972  , 999  , 1026 ,
-                                  1053 , 1080 , 1107 , 1134 , 1161 , 1188 ,
-                                  1215 , 1242 , 1269 , 1296 , 1322 , 1349 ,
-                                  1375 , 1401 , 1427 , 1452 , 1478 , 1503 ,
-                                  1528 , 1552 , 1576 , 1600 , 1624 , 1647 ,
-                                  1670 , 1693 , 1715 , 1737 , 1758 , 1779 ,
-                                  1799 , 1819 , 1839 , 1858 , 1876 , 1895 ,
-                                  1912 , 1929 , 1946 , 1962 , 1977 , 1992 ,
-                                  2006 , 2020 , 2033 , 2045 , 2057 , 2068 ,
-                                  2079 , 2089 , 2098 , 2107 , 2115 , 2123 ,
-                                  2129 , 2135 , 2141 , 2146 , 2150 , 2153 ,
-                                  2156 , 2158 , 2159 , 2160};
+  2146 , 2141 , 2135 , 2129 , 2123 , 2115 ,
+  2107 , 2098 , 2089 , 2079 , 2068 , 2057 ,
+  2045 , 2033 , 2020 , 2006 , 1992 , 1977 ,
+  1962 , 1946 , 1929 , 1912 , 1895 , 1876 ,
+  1858 , 1839 , 1819 , 1799 , 1779 , 1758 ,
+  1737 , 1715 , 1693 , 1670 , 1647 , 1624 ,
+  1600 , 1576 , 1552 , 1528 , 1503 , 1478 ,
+  1452 , 1427 , 1401 , 1375 , 1349 , 1322 ,
+  1296 , 1269 , 1242 , 1215 , 1188 , 1161 ,
+  1134 , 1107 , 1080 , 1053 , 1026 , 999  ,
+  972  , 945  , 918  , 891  , 864  , 838  ,
+  811  , 785  , 759  , 733  , 708  , 682  ,
+  657  , 632  , 608  , 584  , 560  , 536  ,
+  513  , 490  , 467  , 445  , 423  , 402  ,
+  381  , 361  , 341  , 321  , 302  , 284  ,
+  265  , 248  , 231  , 214  , 198  , 183  ,
+  168  , 154  , 140  , 127  , 115  , 103  ,
+  92   , 81   , 71   , 62   , 53   , 45   ,
+  37   , 31   , 25   , 19   , 14   , 10   ,
+  7    , 4    , 2    , 1    , 0    , 0    ,
+  1    , 2    , 4    , 7    , 10   , 14   ,
+  19   , 25   , 31   , 37   , 45   , 53   ,
+  62   , 71   , 81   , 92   , 103  , 115  ,
+  127  , 140  , 154  , 168  , 183  , 198  ,
+  214  , 231  , 248  , 265  , 284  , 302  ,
+  321  , 341  , 361  , 381  , 402  , 423  ,
+  445  , 467  , 490  , 513  , 536  , 560  ,
+  584  , 608  , 632  , 657  , 682  , 708  ,
+  733  , 759  , 785  , 811  , 838  , 864  ,
+  891  , 918  , 945  , 972  , 999  , 1026 ,
+  1053 , 1080 , 1107 , 1134 , 1161 , 1188 ,
+  1215 , 1242 , 1269 , 1296 , 1322 , 1349 ,
+  1375 , 1401 , 1427 , 1452 , 1478 , 1503 ,
+  1528 , 1552 , 1576 , 1600 , 1624 , 1647 ,
+  1670 , 1693 , 1715 , 1737 , 1758 , 1779 ,
+  1799 , 1819 , 1839 , 1858 , 1876 , 1895 ,
+  1912 , 1929 , 1946 , 1962 , 1977 , 1992 ,
+  2006 , 2020 , 2033 , 2045 , 2057 , 2068 ,
+  2079 , 2089 , 2098 , 2107 , 2115 , 2123 ,
+  2129 , 2135 , 2141 , 2146 , 2150 , 2153 ,
+  2156 , 2158 , 2159 , 2160};
 
 uint8_t adc_cal = 0;
 uint8_t PID_cal = 0;
@@ -228,6 +237,7 @@ void main(void)
 
   InitEPwm1Gpio();
   InitGPIO();
+  InitExternalInt();
   //InitEPwm2Gpio();
   //InitEPwm3Gpio();
 
@@ -254,15 +264,80 @@ void main(void)
   }
 }
 
+void InitExternalInt(void)
+{
+  //
+  // Interrupts that are used in this example are re-mapped to
+  // ISR functions found within this file.
+  //
+  EALLOW;            // This is needed to write to EALLOW protected registers
+  PieVectTable.XINT1 = &xint1_isr;
+  PieVectTable.XINT2 = &xint2_isr;
+  EDIS;      // This is needed to disable write to EALLOW protected registers
+
+  //
+  // Enable XINT1 and XINT2 in the PIE: Group 1 interrupt 4 & 5
+  // Enable INT1 which is connected to WAKEINT:
+  //
+  PieCtrlRegs.PIECTRL.bit.ENPIE = 1;          // Enable the PIE block
+  PieCtrlRegs.PIEIER1.bit.INTx4 = 1;          // Enable PIE Group 1 INT4
+  PieCtrlRegs.PIEIER1.bit.INTx5 = 1;          // Enable PIE Group 1 INT5
+  IER |= M_INT1;                              // Enable CPU INT1
+  EINT;
+
+  //
+  // GPIO6 and GPIO7 are inputs
+  //
+  EALLOW;
+  GpioCtrlRegs.GPAMUX1.bit.GPIO6 = 0;     // GPIO
+  GpioCtrlRegs.GPADIR.bit.GPIO6 = 0;      // input
+  GpioCtrlRegs.GPAQSEL1.bit.GPIO6 = 1;    // XINT1 Synch to SYSCLKOUT only
+
+  GpioCtrlRegs.GPAMUX1.bit.GPIO7 = 0;     // GPIO
+  GpioCtrlRegs.GPADIR.bit.GPIO7 = 0;      // input
+  GpioCtrlRegs.GPAQSEL1.bit.GPIO7 = 1;    // XINT2 Synch to SYSCLKOUT only
+
+  GpioCtrlRegs.GPACTRL.bit.QUALPRD0 = 0x7F;
+  EDIS;
+
+  //
+  // GPIO6 is XINT1, GPIO7 is XINT2
+  //
+  EALLOW;
+  GpioIntRegs.GPIOXINT1SEL.bit.GPIOSEL = 6;   // XINT1 is GPIO0
+  GpioIntRegs.GPIOXINT2SEL.bit.GPIOSEL = 7;   // XINT2 is GPIO1
+  EDIS;
+
+  //
+  // Configure XINT1
+  //
+  XIntruptRegs.XINT1CR.bit.POLARITY = 0;      // Falling edge interrupt
+  XIntruptRegs.XINT2CR.bit.POLARITY = 1;      // Rising edge interrupt
+
+  //
+  // Enable XINT1 and XINT2
+  //
+  XIntruptRegs.XINT1CR.bit.ENABLE = 1;        // Enable XINT1
+  XIntruptRegs.XINT2CR.bit.ENABLE = 1;        // Enable XINT2
+
+  //
+  // GPIO34 will go low inside each interrupt.  Monitor this on a scope
+  //
+  EALLOW;
+  GpioCtrlRegs.GPBMUX1.bit.GPIO34 = 0;        // GPIO
+  GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;         // output
+  EDIS;
+}
+
 void InitGPIO(void)
 {
-    EALLOW;
+  EALLOW;
 
-    GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;    // Disable pull-up on GPIO2
-    GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 0;   // Configure GPIO2 not as EPWM2A
-    GpioCtrlRegs.GPADIR.bit.GPIO2 = 1;    // Configure GPIO2 as output
+  GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;    // Disable pull-up on GPIO2
+  GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 0;   // Configure GPIO2 not as EPWM2A
+  GpioCtrlRegs.GPADIR.bit.GPIO2 = 1;    // Configure GPIO2 as output
 
-    EDIS;
+  EDIS;
 }
 
 void initPWM()
@@ -322,7 +397,7 @@ void initTimer()
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
   ConfigCpuTimer(&CpuTimer0, 60, 500000);
-  ConfigCpuTimer(&CpuTimer1, 60, 100);
+  ConfigCpuTimer(&CpuTimer1, 60, 21000);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
   // To ensure precise timing, use write-only instructions to write to the
@@ -578,8 +653,8 @@ int32_t pre_storage_adc0(void)
   adc_sum0 += AdcResult.ADCRESULT0;
   if (counter < sample_size)
   {
-      counter++;
-      return ((int32_t)(AdcResult.ADCRESULT0)*sample_size);
+    counter++;
+    return ((int32_t)(AdcResult.ADCRESULT0)*sample_size);
   }
   return adc_sum0;
 }
@@ -594,8 +669,8 @@ int32_t pre_storage_adc1(void)
   adc_sum1 += AdcResult.ADCRESULT1;
   if (counter < sample_size)
   {
-      counter++;
-      return ((int32_t)(AdcResult.ADCRESULT1)*sample_size);
+    counter++;
+    return ((int32_t)(AdcResult.ADCRESULT1)*sample_size);
   }
   return adc_sum1;
 }
@@ -605,9 +680,9 @@ int32_t adc_value_aver_1 = 0;
 
 __interrupt void adc1_isr(void)
 {
-//  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
-//  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
-//  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
+  //  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
+  //  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
+  //  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
   adc_value_aver_0 = pre_storage_adc0()/sample_size;
   adc_value_aver_1 = pre_storage_adc1()/sample_size;
   (ConversionCount == sample_size-1) ? (adc_cal = 1, ConversionCount = 0) : (ConversionCount++);
@@ -756,13 +831,6 @@ void get_PI_signal0(float *error_list)
 void change_duty(void)
 {
   EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision/100;
-  if (adc_value1 >= 0)
-  {
-      GpioDataRegs.GPACLEAR.bit.GPIO2 = 1;
-  } else
-  {
-      GpioDataRegs.GPASET.bit.GPIO2 = 1;
-  }
 }
 
 // cpu_timer0_isr -
@@ -784,6 +852,10 @@ __interrupt void cpu_timer1_isr(void)
   EDIS;
 }
 
+volatile uint32_t Xint1Count = 0;
+volatile uint32_t Xint2Count = 0;
+volatile uint32_t Xint1_last = 0;
+volatile uint32_t Xint2_last = 0;
 // cpu_timer2_isr -
 __interrupt void cpu_timer2_isr(void)
 {
@@ -792,4 +864,40 @@ __interrupt void cpu_timer2_isr(void)
 
   // The CPU acknowledges the interrupt.
   EDIS;
+
+//  if( ((Xint1Count-Xint1_last) + (Xint2Count+Xint2_last)) == 0)
+//  {
+//    GpioDataRegs.GPBTOGGLE.bit.GPIO34 = 1;
+//  }
+//  Xint1_last = Xint1Count;
+//  Xint2_last = Xint2Count;
+}
+
+
+//
+// xint1_isr -
+//
+__interrupt void xint1_isr(void)
+{
+  GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
+  Xint1Count++;
+
+  //
+  // Acknowledge this interrupt to get more from group 1
+  //
+  PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
+
+//
+// xint2_isr -
+//
+__interrupt void xint2_isr(void)
+{
+  GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
+  Xint2Count++;
+
+  //
+  // Acknowledge this interrupt to get more from group 1
+  //
+  PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
