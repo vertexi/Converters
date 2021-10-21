@@ -110,55 +110,55 @@ float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (600)
-#define ADC_PERIOD 100
-float T_sam = 0.000100;
+#define EPWM1_PRD (2400)
+#define ADC_PERIOD 200
+float T_sam = 0.000200;
 float P_arg0 = 0.1;
 float I_arg0 = 80;
 
 #define spwm_size 250
-uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,
-  2146 , 2141 , 2135 , 2129 , 2123 , 2115 ,
-  2107 , 2098 , 2089 , 2079 , 2068 , 2057 ,
-  2045 , 2033 , 2020 , 2006 , 1992 , 1977 ,
-  1962 , 1946 , 1929 , 1912 , 1895 , 1876 ,
-  1858 , 1839 , 1819 , 1799 , 1779 , 1758 ,
-  1737 , 1715 , 1693 , 1670 , 1647 , 1624 ,
-  1600 , 1576 , 1552 , 1528 , 1503 , 1478 ,
-  1452 , 1427 , 1401 , 1375 , 1349 , 1322 ,
-  1296 , 1269 , 1242 , 1215 , 1188 , 1161 ,
-  1134 , 1107 , 1080 , 1053 , 1026 , 999  ,
-  972  , 945  , 918  , 891  , 864  , 838  ,
-  811  , 785  , 759  , 733  , 708  , 682  ,
-  657  , 632  , 608  , 584  , 560  , 536  ,
-  513  , 490  , 467  , 445  , 423  , 402  ,
-  381  , 361  , 341  , 321  , 302  , 284  ,
-  265  , 248  , 231  , 214  , 198  , 183  ,
-  168  , 154  , 140  , 127  , 115  , 103  ,
-  92   , 81   , 71   , 62   , 53   , 45   ,
-  37   , 31   , 25   , 19   , 14   , 10   ,
-  7    , 4    , 2    , 1    , 0    , 0    ,
-  1    , 2    , 4    , 7    , 10   , 14   ,
-  19   , 25   , 31   , 37   , 45   , 53   ,
-  62   , 71   , 81   , 92   , 103  , 115  ,
-  127  , 140  , 154  , 168  , 183  , 198  ,
-  214  , 231  , 248  , 265  , 284  , 302  ,
-  321  , 341  , 361  , 381  , 402  , 423  ,
-  445  , 467  , 490  , 513  , 536  , 560  ,
-  584  , 608  , 632  , 657  , 682  , 708  ,
-  733  , 759  , 785  , 811  , 838  , 864  ,
-  891  , 918  , 945  , 972  , 999  , 1026 ,
-  1053 , 1080 , 1107 , 1134 , 1161 , 1188 ,
-  1215 , 1242 , 1269 , 1296 , 1322 , 1349 ,
-  1375 , 1401 , 1427 , 1452 , 1478 , 1503 ,
-  1528 , 1552 , 1576 , 1600 , 1624 , 1647 ,
-  1670 , 1693 , 1715 , 1737 , 1758 , 1779 ,
-  1799 , 1819 , 1839 , 1858 , 1876 , 1895 ,
-  1912 , 1929 , 1946 , 1962 , 1977 , 1992 ,
-  2006 , 2020 , 2033 , 2045 , 2057 , 2068 ,
-  2079 , 2089 , 2098 , 2107 , 2115 , 2123 ,
-  2129 , 2135 , 2141 , 2146 , 2150 , 2153 ,
-  2156 , 2158 , 2159 , 2160};
+int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
+                                  134  , 155  , 175  , 195  , 215  , 235  ,
+                                  255  , 275  , 294  , 313  , 332  , 351  ,
+                                  370  , 388  , 406  , 424  , 442  , 459  ,
+                                  476  , 493  , 510  , 526  , 542  , 557  ,
+                                  572  , 587  , 601  , 615  , 629  , 642  ,
+                                  655  , 667  , 679  , 691  , 702  , 713  ,
+                                  723  , 733  , 742  , 751  , 759  , 767  ,
+                                  774  , 781  , 788  , 794  , 799  , 804  ,
+                                  808  , 812  , 816  , 818  , 821  , 823  ,
+                                  824  , 825  , 825  , 825  , 824  , 823  ,
+                                  821  , 818  , 816  , 812  , 808  , 804  ,
+                                  799  , 794  , 788  , 781  , 774  , 767  ,
+                                  759  , 751  , 742  , 733  , 723  , 713  ,
+                                  702  , 691  , 679  , 667  , 655  , 642  ,
+                                  629  , 615  , 601  , 587  , 572  , 557  ,
+                                  542  , 526  , 510  , 493  , 476  , 459  ,
+                                  442  , 424  , 406  , 388  , 370  , 351  ,
+                                  332  , 313  , 294  , 275  , 255  , 235  ,
+                                  215  , 195  , 175  , 155  , 134  , 114  ,
+                                  93   , 72   , 52   , 31   , 10   , -10  ,
+                                  -31  , -52  , -72  , -93  , -114 , -134 ,
+                                  -155 , -175 , -195 , -215 , -235 , -255 ,
+                                  -275 , -294 , -313 , -332 , -351 , -370 ,
+                                  -388 , -406 , -424 , -442 , -459 , -476 ,
+                                  -493 , -510 , -526 , -542 , -557 , -572 ,
+                                  -587 , -601 , -615 , -629 , -642 , -655 ,
+                                  -667 , -679 , -691 , -702 , -713 , -723 ,
+                                  -733 , -742 , -751 , -759 , -767 , -774 ,
+                                  -781 , -788 , -794 , -799 , -804 , -808 ,
+                                  -812 , -816 , -818 , -821 , -823 , -824 ,
+                                  -825 , -825 , -825 , -824 , -823 , -821 ,
+                                  -818 , -816 , -812 , -808 , -804 , -799 ,
+                                  -794 , -788 , -781 , -774 , -767 , -759 ,
+                                  -751 , -742 , -733 , -723 , -713 , -702 ,
+                                  -691 , -679 , -667 , -655 , -642 , -629 ,
+                                  -615 , -601 , -587 , -572 , -557 , -542 ,
+                                  -526 , -510 , -493 , -476 , -459 , -442 ,
+                                  -424 , -406 , -388 , -370 , -351 , -332 ,
+                                  -313 , -294 , -275 , -255 , -235 , -215 ,
+                                  -195 , -175 , -155 , -134 , -114 , -93  ,
+                                  -72  , -52  , -31  , -10};
 
 uint8_t adc_cal = 0;
 uint8_t PID_cal = 0;
@@ -183,6 +183,9 @@ float phase1_amplitude = 0;
 float phase1_freq = 50;
 float phase1_phase = 0;
 
+uint16_t signal_pwm_counter = 0;
+uint32_t signal_begin_time = 0;
+
 // Main
 void main(void)
 {
@@ -190,6 +193,7 @@ void main(void)
   // RAM InitSysCtrl includes a call to a RAM based function and without a
   // call to memcpy first, the processor will go "into the weeds"
   memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
+
   int i;
   for (i = 0; i < sample_size; i++)
   {
@@ -397,7 +401,7 @@ void initTimer()
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
   ConfigCpuTimer(&CpuTimer0, 60, 500000);
-  ConfigCpuTimer(&CpuTimer1, 60, 21000);
+  ConfigCpuTimer(&CpuTimer1, 60, 80);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
   // To ensure precise timing, use write-only instructions to write to the
@@ -756,10 +760,14 @@ void adc_calculate(void)
   adc_error_clear();
 }
 
-float voltage_k = 0.04;
+float voltage_k = 0.5;
+float virtual_signal = 0;
 
 int32_t adc_value1_buffer[200];
 uint8_t adc_value1_counter = 0;
+
+int32_t adc_value0_buffer[200];
+uint8_t adc_value0_counter = 0;
 void get_adc_values(void)
 {
   adc_value1 = ((adc_value_aver_1*3300>>12)-1680)*3*10; // voltage
@@ -769,7 +777,15 @@ void get_adc_values(void)
 
   adc_value0 = ((adc_value_aver_0*3300>>12)-1660)*3; // current
 
-  target_0 = adc_value1 * voltage_k;
+  adc_value0_buffer[adc_value0_counter] = adc_value0;
+  (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
+
+  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
+  if (temp_counter < spwm_size)
+  {
+    virtual_signal = spwm_table[temp_counter];
+  }
+  target_0 = virtual_signal * voltage_k;
 }
 
 float P_error0 = 0;
@@ -852,10 +868,6 @@ __interrupt void cpu_timer1_isr(void)
   EDIS;
 }
 
-volatile uint32_t Xint1Count = 0;
-volatile uint32_t Xint2Count = 0;
-volatile uint32_t Xint1_last = 0;
-volatile uint32_t Xint2_last = 0;
 // cpu_timer2_isr -
 __interrupt void cpu_timer2_isr(void)
 {
@@ -864,23 +876,16 @@ __interrupt void cpu_timer2_isr(void)
 
   // The CPU acknowledges the interrupt.
   EDIS;
-
-//  if( ((Xint1Count-Xint1_last) + (Xint2Count+Xint2_last)) == 0)
-//  {
-//    GpioDataRegs.GPBTOGGLE.bit.GPIO34 = 1;
-//  }
-//  Xint1_last = Xint1Count;
-//  Xint2_last = Xint2Count;
 }
-
 
 //
 // xint1_isr -
 //
 __interrupt void xint1_isr(void)
 {
+  signal_pwm_counter = 125;
+  signal_begin_time = CpuTimer1.InterruptCount;
   GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
-  Xint1Count++;
 
   //
   // Acknowledge this interrupt to get more from group 1
@@ -893,8 +898,9 @@ __interrupt void xint1_isr(void)
 //
 __interrupt void xint2_isr(void)
 {
+  signal_pwm_counter = 0;
+  signal_begin_time = CpuTimer1.InterruptCount;
   GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
-  Xint2Count++;
 
   //
   // Acknowledge this interrupt to get more from group 1
