@@ -78,8 +78,7 @@ float error_list1[3] = {0,0,0};
 
 #define sample_size 12
 int16_t ADC0[sample_size] = {0};
-int16_t ADC1[sample_size] = {0};
-int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
+int16_t ADC1[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
 float ADC0_slope = 1.0413;
 float ADC0_intercept = -0.0003;
@@ -113,7 +112,7 @@ float target_k = 1; // current 1/ current 2
 #define EPWM1_PRD (1200)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
-float P_arg0 = 0.075;
+float P_arg0 = 0.05;
 float I_arg0 = 0;
 
 #define spwm_size 250
@@ -163,26 +162,6 @@ int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
 uint8_t adc_cal = 0;
 uint8_t PID_cal = 0;
 
-int16_t adc_max = 0;
-int16_t adc_min = 5000;
-int16_t adc0_max = 0;
-int16_t adc2_max = 0;
-
-int16_t adc0_max_p = 0;
-int16_t adc1_max_p = 0;
-int16_t adc2_max_p = 0;
-
-int16_t adc_max_index = 0;
-int16_t adc_min_index = 0;
-
-float adc_amplitude = 0;
-float adc_cycle = 0;
-float adc_phase = 0;
-
-float phase1_amplitude = 0;
-float phase1_freq = 50;
-float phase1_phase = 0;
-
 uint16_t signal_pwm_counter = 125;
 uint32_t signal_begin_time = 0;
 
@@ -199,7 +178,6 @@ void main(void)
   {
     ADC0[i] = 0;
     ADC1[i] = 0;
-    ADC2[i] = 0;
   }
 
   target_0 += TARGET_0_ADJ;
@@ -252,12 +230,6 @@ void main(void)
   for(;;)
   {
     //    __asm("          NOP");
-    if (adc_cal == 1)
-    {
-      //adc_calculate();
-      adc_cal = 0;
-    }
-
     if (PID_cal == 1)
     {
       PID_cal = 0;
@@ -476,19 +448,17 @@ void initMyAdc()
   // set SOC0 channel select to ADCINA6
   AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
   AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
-  AdcRegs.ADCSOC2CTL.bit.CHSEL  = 2;
+  AdcRegs.ADCSOC2CTL.bit.CHSEL  = 6;
 
   // 设置为 EOC 采样的触发条件，5为epwm1 soca, 1为 timer0
   // 现在我想要全手动软件控制，即为 0 ， software only.
-  // set SOC0 start trigger on EPWM1A, due to round-robin SOC0 converts first
+  // set SOC0 start trigger on timer2, due to round-robin SOC0 converts first
   // then SOC1
   AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 3;
-
-  // set SOC1 start trigger on EPWM1A, due to round-robin SOC0 converts first
+  // set SOC1 start trigger on timer2, due to round-robin SOC0 converts first
   // then SOC1
   AdcRegs.ADCSOC1CTL.bit.TRIGSEL  = 3;
-
-  // set SOC2 start trigger on EPWM1A, due to round-robin SOC0 converts first
+  // set SOC2 start trigger on timer2, due to round-robin SOC0 converts first
   // then SOC1, then SOC2
   AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 3;
 
@@ -625,44 +595,20 @@ void InitEPwm3Example()
   EPwm3Regs.ETPS.bit.INTPRD = ET_1ST;           // Generate INT on 3rd event
 }
 
-void adc_error_clear(void)
-{
-  int i;
-  for (i = 0; i < sample_size; i++)
-  {
-    ADC0[i] = 0;
-    ADC1[i] = 0;
-    ADC2[i] = 0;
-  }
-
-  adc0_max_p = adc0_max;
-  adc1_max_p = adc_max;
-  adc2_max_p = adc2_max;
-
-  adc_max = 0;
-  adc_min = 5000;
-  adc0_max = 0;
-  adc2_max = 0;
-
-  adc_max_index = 0;
-  adc_min_index = 0;
-}
-
 int32_t pre_storage_adc0(void)
 {
   static int32_t adc_sum0 = 0;
   static uint8_t counter = 0;
   adc_sum0 -= ADC0[ConversionCount];
-  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
-  adc_sum0 += AdcResult.ADCRESULT0;
+  ADC0[ConversionCount] = AdcResult.ADCRESULT2;
+  adc_sum0 += AdcResult.ADCRESULT2;
   if (counter < sample_size)
   {
     counter++;
-    return ((int32_t)(AdcResult.ADCRESULT0)*sample_size);
+    return ((int32_t)(AdcResult.ADCRESULT2)*sample_size);
   }
   return adc_sum0;
 }
-
 
 int32_t pre_storage_adc1(void)
 {
@@ -684,12 +630,9 @@ int32_t adc_value_aver_1 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  //  ADC0[ConversionCount] = AdcResult.ADCRESULT0;
-  //  ADC1[ConversionCount] = AdcResult.ADCRESULT1;
-  //  ADC2[ConversionCount] = AdcResult.ADCRESULT2;
   adc_value_aver_0 = pre_storage_adc0()/sample_size;
   adc_value_aver_1 = pre_storage_adc1()/sample_size;
-  (ConversionCount == sample_size-1) ? (adc_cal = 1, ConversionCount = 0) : (ConversionCount++);
+  (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
   PID_cal = 1;
 
@@ -700,64 +643,6 @@ __interrupt void adc1_isr(void)
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
   return;
-}
-
-#define adc_cycle_buffer_size 24
-int adc_cycle_counter = 0;
-int adc_cycle_buffer[adc_cycle_buffer_size];
-
-void adc_calculate(void)
-{
-  int i = sample_size-3;
-  int max_search = 0;
-  int min_search = 0;
-
-  for ( ;i >= 2; i--)
-  {
-    if ((adc_max - 20) <= ADC1[i] &&
-        ADC1[i] >= ADC1[i-1] && ADC1[i-1] >= ADC1[i-2] &&
-        ADC1[i] >= ADC1[i+1] && ADC1[i+1] >= ADC1[i+2])
-    {
-      adc_max_index = i;
-      max_search = 1;
-      break;
-    }
-  }
-
-  for ( ;i >= 2; i--)
-  {
-    if (ADC1[i] <= (adc_min+20) && ADC1[i] <= ADC1[i-1] && ADC1[i-1] <= ADC1[i-2] &&
-        ADC1[i] <= ADC1[i+1] && ADC1[i+1] <= ADC1[i+2] && (adc_max_index - i)>10 && (adc_max_index - i)<30)
-    {
-      adc_min = ADC1[i];
-      adc_min_index = i;
-      min_search = 1;
-      break;
-    }
-  }
-
-  if (max_search == 1 && min_search == 1)
-  {
-    adc_cycle_buffer[adc_cycle_counter] = adc_max_index - adc_min_index;
-    (adc_cycle_counter == adc_cycle_buffer_size-1) ? (adc_cycle_counter = 0) : (adc_cycle_counter++);
-    if (adc_cycle_counter == 0)
-    {
-      adc_cycle = 0;
-      int j;
-      for (j = 0; j < adc_cycle_buffer_size; j++)
-      {
-        adc_cycle += adc_cycle_buffer[j];
-      }
-      adc_cycle = (adc_cycle/adc_cycle_buffer_size)*2;
-      if (adc_cycle < 0) adc_cycle *= -1;
-      phase1_freq = roundf(1/(T_sam*adc_cycle));
-    }
-  }
-
-  adc_amplitude = (float)(adc_max - adc_min);
-  phase1_amplitude = (adc_amplitude/4096.0)*3.3;
-
-  adc_error_clear();
 }
 
 float voltage_k = 0.3;
@@ -784,8 +669,8 @@ int16_t counter_counter = 0;
 int32_t adc1_bias = 2000;
 int32_t adc0_bias = 2000;
 
-int32_t current_adc1_bias = 1960;
-int32_t current_adc0_bias = 1955;
+int32_t current_adc1_bias = 1700;
+int32_t current_adc0_bias = 1880;
 void get_adc_values(void)
 {
   adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
