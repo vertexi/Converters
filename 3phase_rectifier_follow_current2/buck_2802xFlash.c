@@ -110,11 +110,11 @@ float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (2400)
+#define EPWM1_PRD (1200)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
-float P_arg0 = 0.1;
-float I_arg0 = 80;
+float P_arg0 = 0.075;
+float I_arg0 = 0;
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -301,7 +301,7 @@ void InitExternalInt(void)
   GpioCtrlRegs.GPADIR.bit.GPIO7 = 0;      // input
   GpioCtrlRegs.GPAQSEL1.bit.GPIO7 = 1;    // XINT2 Synch to SYSCLKOUT only
 
-  GpioCtrlRegs.GPACTRL.bit.QUALPRD0 = 0x8F;
+  GpioCtrlRegs.GPACTRL.bit.QUALPRD0 = 0x6F;
   EDIS;
 
   //
@@ -760,7 +760,7 @@ void adc_calculate(void)
   adc_error_clear();
 }
 
-float voltage_k = 0.5;
+float voltage_k = 0.3;
 float virtual_signal = 0;
 
 int16_t adc_value1_buffer[200];
@@ -772,31 +772,41 @@ uint8_t adc_value0_counter = 0;
 int16_t target0_buffer[200];
 uint8_t target0_counter = 0;
 
-int16_t toltal_buffer[400];
-int16_t toltal_counter = 0;
+int16_t differ_buffer[200];
+uint8_t differ_counter = 0;
+
+//int16_t toltal_buffer[400];
+//int16_t toltal_counter = 0;
 
 int16_t counter_buffer[200];
 int16_t counter_counter = 0;
 
 int32_t adc1_bias = 2000;
 int32_t adc0_bias = 2000;
+
+int32_t current_adc1_bias = 1960;
+int32_t current_adc0_bias = 1955;
 void get_adc_values(void)
 {
-  adc_value1 = ((adc_value_aver_1-1980)*3300>>12)*3*10; // voltage
+  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
 
   adc_value1_buffer[adc_value1_counter] = adc_value1;
   (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
-  adc_value0 = ((adc_value_aver_0-1920)*3300>>12)*3; // current
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*3; // current
 
   adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 
-  if ((CpuTimer1.InterruptCount-signal_begin_time) >= 125)
-  {
-    signal_begin_time = CpuTimer1.InterruptCount-124;
-  }
+//  if ((CpuTimer1.InterruptCount-signal_begin_time) >= 125)
+//  {
+//    signal_begin_time = CpuTimer1.InterruptCount-124;
+//  }
   uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
+  if (temp_counter > (spwm_size-1))
+  {
+    temp_counter -= spwm_size;
+  }
   virtual_signal = spwm_table[temp_counter];
 
   counter_buffer[counter_counter] = temp_counter;
@@ -806,9 +816,12 @@ void get_adc_values(void)
   target0_buffer[target0_counter] = target_0;
   (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
 
-  toltal_buffer[toltal_counter] = adc_value1;
-  toltal_buffer[toltal_counter+1] = target_0;
-  (toltal_counter == 200-2) ? (toltal_counter = 0) : (toltal_counter+=2);
+  differ_buffer[differ_counter] = target_0 - adc_value1;
+  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
+
+//  toltal_buffer[toltal_counter] = adc_value1;
+//  toltal_buffer[toltal_counter+1] = target_0;
+//  (toltal_counter == 200-2) ? (toltal_counter = 0) : (toltal_counter+=2);
 }
 
 float P_error0 = 0;
@@ -911,12 +924,15 @@ int32_t high_value2 = 0;
 int32_t temp_see = 1;
 int32_t temp_th_hi = 105;
 int32_t temp_th_lo = 25;
+
+int16_t phase_shift_corr = 235;
+
 __interrupt void xint1_isr(void)
 {
   temp_see = CpuTimer1.InterruptCount - signal_begin_time;
   if (temp_see > temp_th_hi || temp_see < temp_th_lo)
   {
-    signal_pwm_counter = 125;
+    signal_pwm_counter = 125+phase_shift_corr;
     signal_begin_time = CpuTimer1.InterruptCount;
     GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
 
@@ -940,7 +956,7 @@ __interrupt void xint2_isr(void)
   temp_see = CpuTimer1.InterruptCount - signal_begin_time;
   if (temp_see > temp_th_hi || temp_see < temp_th_lo)
   {
-    signal_pwm_counter = 0;
+    signal_pwm_counter = phase_shift_corr;
     signal_begin_time = CpuTimer1.InterruptCount;
     GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
 
