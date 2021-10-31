@@ -9,8 +9,6 @@
 // the linker cmd file.
 #pragma CODE_SECTION(epwm1_isr, "ramfuncs");
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
-#pragma CODE_SECTION(adc_calculate, "ramfuncs");
-#pragma CODE_SECTION(adc_error_clear, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 #pragma CODE_SECTION(get_adc_values, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
@@ -65,8 +63,8 @@ void get_adc_values(void);
 int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
 int32_t pre_storage_adc2(void);
-void adc_error_clear(void);
-void adc_calculate(void);
+void update_adc_bias();
+void adc_bias_cali(uint32_t precounter);
 
 int INIT_DUTY0 = 10; // for pwm1
 int INIT_DUTY1 = 10; // for pwm2
@@ -104,7 +102,7 @@ float adc_value0 = 0; // current1
 float adc_value1 = 0; // voltage
 float adc_value2 = 0; // current2
 
-float target_0 = 8; // expect value for valtage
+float target_0 = 8; // expect value for voltage
 float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
@@ -161,9 +159,24 @@ int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
 
 uint8_t adc_cal = 0;
 uint8_t PID_cal = 0;
+uint8_t PRE_cal = 0;
 
 uint16_t signal_pwm_counter = 125;
 uint32_t signal_begin_time = 0;
+
+// pin defination
+// ADCINA6 current namely ADC0
+// ADCINA4 voltage namely ADC1
+// GPIO6 XINT1
+// GPIO7 XINT2
+// GPIO34 square wave follow GPIO6 GPIO7
+// PWM1A high PWM out
+// PWM1B complement PWM out
+// GPIO19 MOSFET shut down signal
+
+// cputimer0, PRE-calculation timer
+// cputimer1, SPWM counter
+// cputimer2, ADC timer
 
 // Main
 void main(void)
@@ -217,8 +230,8 @@ void main(void)
   // This function is found in f2802x_PieVect.c.
   InitPieVectTable();
 
-  InitEPwm1Gpio();
   InitGPIO();
+  InitEPwm1Gpio();
   InitExternalInt();
   //InitEPwm2Gpio();
   //InitEPwm3Gpio();
@@ -298,6 +311,7 @@ void InitExternalInt(void)
 
   //
   // GPIO34 will go low inside each interrupt.  Monitor this on a scope
+  // indicate the external square wave, you can attach scope probe on it have a watch
   //
   EALLOW;
   GpioCtrlRegs.GPBMUX1.bit.GPIO34 = 0;        // GPIO
@@ -307,12 +321,12 @@ void InitExternalInt(void)
 
 void InitGPIO(void)
 {
+  // GPOIO19 use to shut down the MOSFET driver
   EALLOW;
-
-  GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;    // Disable pull-up on GPIO2
-  GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 0;   // Configure GPIO2 not as EPWM2A
-  GpioCtrlRegs.GPADIR.bit.GPIO2 = 1;    // Configure GPIO2 as output
-
+  GpioCtrlRegs.GPAMUX2.bit.GPIO19 = 0;        // GPIO
+  GpioDataRegs.GPADAT.bit.GPIO19 = 0;
+  GpioCtrlRegs.GPADIR.bit.GPIO19 = 1;         // output
+  GpioDataRegs.GPACLEAR.bit.GPIO19 = 1;       // GPIO19 is low
   EDIS;
 }
 
@@ -372,7 +386,7 @@ void initTimer()
 
   // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
   // 60MHz CPU Freq, 1 second Period (in uSeconds)
-  ConfigCpuTimer(&CpuTimer0, 60, 500000);
+  ConfigCpuTimer(&CpuTimer0, 60, 10000);
   ConfigCpuTimer(&CpuTimer1, 60, 80);
   ConfigCpuTimer(&CpuTimer2, 60, ADC_PERIOD);
 
@@ -669,8 +683,8 @@ int16_t counter_counter = 0;
 int32_t adc1_bias = 2000;
 int32_t adc0_bias = 2000;
 
-int32_t current_adc1_bias = 1700;
-int32_t current_adc0_bias = 1880;
+int32_t current_adc1_bias = 1750;
+int32_t current_adc0_bias = 1895;
 void get_adc_values(void)
 {
   adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
@@ -770,14 +784,75 @@ void change_duty(void)
   EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision/100;
 }
 
+int32_t adc1_bias_sum = 0;
+int32_t adc0_bias_sum = 0;
+uint8_t pre_pre_cal = 1;
+int32_t adc_bias_cache_size = 0;
+
 // cpu_timer0_isr -
 __interrupt void cpu_timer0_isr(void)
 {
-  CpuTimer0.InterruptCount++;
+  static uint32_t previous_counter = 0;
 
+  if (CpuTimer0.InterruptCount <= 100 && GpioDataRegs.GPADAT.bit.GPIO19 == 1)
+  {
+    GpioDataRegs.GPACLEAR.bit.GPIO19 = 1;       // GPIO19 is low
+  } else if (CpuTimer0.InterruptCount > 100 && GpioDataRegs.GPADAT.bit.GPIO19 == 0)
+  {
+    GpioDataRegs.GPASET.bit.GPIO19 = 1;         // GPIO19 is high
+  }
+
+  if (CpuTimer0.InterruptCount % 1000 == 0)
+  {
+     PRE_cal = 0;
+     pre_pre_cal = 1;
+  }
+
+  if (pre_pre_cal == 1 && PRE_cal == 0)
+  {
+    previous_counter = CpuTimer0.InterruptCount;
+    pre_pre_cal = 0;
+  }
+  CpuTimer0.InterruptCount++;
+  if (PRE_cal == 0)
+  {
+    //adc_bias_cali(previous_counter);
+  }
   // Acknowledge this interrupt to receive more interrupts from group 1
   //Gpio_example1();
   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+  //GpioDataRegs.GPATOGGLE.bit.GPIO19 = 1;   // GPIO9 is toggle(just for pin identification test)
+}
+
+void adc_bias_cali(uint32_t precounter)
+{
+  uint32_t counterdiff = 0;
+  counterdiff = CpuTimer0.InterruptCount - precounter;
+  if (counterdiff > 0 && counterdiff <= 50)
+  {
+    adc1_bias_sum += adc1_bias;
+    adc0_bias_sum += adc0_bias;
+    adc_bias_cache_size++;
+  }
+  if (counterdiff <= 50 && PRE_cal == 1)
+  {
+    PRE_cal = 0;
+  }
+  if (counterdiff > 50)
+  {
+    update_adc_bias();
+    PRE_cal = 1;
+  }
+}
+
+void update_adc_bias()
+{
+  current_adc1_bias = adc1_bias_sum/adc_bias_cache_size;
+  current_adc0_bias = adc0_bias_sum/adc_bias_cache_size;
+
+  adc_bias_cache_size = 0;
+  adc1_bias_sum = 0;
+  adc0_bias_sum = 0;
 }
 
 // cpu_timer1_isr -
