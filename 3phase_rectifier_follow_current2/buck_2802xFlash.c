@@ -60,7 +60,7 @@ void initMyAdc();
 void get_PI_signal0(float *error_list);
 void change_duty(void);
 void get_adc_values(void);
-//void get_PI_signal1(float *error_list);
+void get_PI_signal1(float *error_list);
 
 int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
@@ -72,9 +72,9 @@ int INIT_DUTY0 = 10; // for pwm1
 int INIT_DUTY1 = 10; // for pwm2
 int INIT_DUTY2 = 10; // for pwm2
 #define INIT_PI0 10; //
-#define INIT_PI1 1; //
+#define INIT_PI1 3; //
 float error_list0[3] = {1,1,1};
-float error_list1[3] = {0,0,0};
+float error_list1[3] = {0,0,3};
 
 #define sample_size 12
 int16_t ADC0[sample_size] = {0};
@@ -110,11 +110,13 @@ float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (1200)
+#define EPWM1_PRD (3600)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
+float P_arg1 = 0.8;
+float I_arg1 = 0.1;
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -235,7 +237,7 @@ void main(void)
     if (PID_cal == 1)
     {
       PID_cal = 0;
-      get_adc_values();
+      get_PI_signal1(error_list1);
       get_PI_signal0(error_list0);
       change_duty();
     }
@@ -653,9 +655,13 @@ int32_t adc_value_aver_2 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+    adc_value_aver_0 = AdcResult.ADCRESULT2;
+    adc_value_aver_1 = AdcResult.ADCRESULT1;
+    adc_value_aver_2 = AdcResult.ADCRESULT3;
+    get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
   PID_cal = 1;
@@ -700,9 +706,9 @@ int32_t current_adc1_bias = 1700;
 int32_t current_adc0_bias = 1880;
 void get_adc_values(void)
 {
-  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
-  adc_value1_buffer[adc_value1_counter] = adc_value1;
-  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
+//  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
+//  adc_value1_buffer[adc_value1_counter] = adc_value1;
+//  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
   adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003418; // current
   adc_value0_buffer[adc_value0_counter] = adc_value0;
@@ -744,12 +750,70 @@ int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision = 1;
 double geiding = 3;
+double target_dc = 6;
+double PI1_decision = 3;
 void get_PI_signal0(float *error_list)
 {
-  PI0_decision = ((adc_value0/geiding)*0.5+0.5) * 100;
+  PI0_decision = ((adc_value0/PI1_decision)*0.5+0.5) * 100;
 
   return;
 }
+
+float P_error1 = 0;
+float I_error1 = 0;
+float PI1_HILIMIT = 30.0f;
+float PI1_LOLIMIT = 1.0f;
+void get_PI_signal1(float *error_list)
+{
+  // error_list[0]  diff error
+  // error_list[1]  current error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+
+  if (first_flag < 50)
+  {
+    first_flag++;
+  }
+
+  error_list[0] = target_dc - adc_value2;
+  error_list[1] += error_list[0];
+
+  if(error_list[1]>PI1_HILIMIT)
+      error_list[1]=PI1_HILIMIT;
+  else if(error_list[1]<PI1_LOLIMIT)
+      error_list[1]=PI1_LOLIMIT;
+
+  P_error1 = P_arg1*error_list[0];
+  I_error1 = I_arg1*error_list[1];
+  error_list[2] = P_error1 + I_error1;
+
+//  if (error_list[2] > PI1_HILIMIT && I_error1 > 0)
+//  {
+//    I_en = 0;
+//  }else if (error_list[2] < PI1_LOLIMIT && I_error1 < 0)
+//  {
+//    I_en = 0;
+//  }else
+//  {
+//    I_en = 1;
+//  }
+
+  if (error_list[2] > PI1_HILIMIT)
+  {
+    error_list[2] = PI1_HILIMIT;
+  }
+  else if (error_list[2] < PI1_LOLIMIT)
+  {
+    error_list[2] = PI1_LOLIMIT;
+  }
+
+  PI1_decision = error_list[2];
+
+  return;
+}
+
+
 
 void change_duty(void)
 {
@@ -800,18 +864,18 @@ int16_t phase_shift_corr = 235;
 
 __interrupt void xint1_isr(void)
 {
-  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
-  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
-  {
-    signal_pwm_counter = 125+phase_shift_corr;
-    signal_begin_time = CpuTimer1.InterruptCount;
-    GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
-
-    low_value = adc_value_aver_1;
-    low_value2 = adc_value_aver_0;
-    adc1_bias = (low_value+high_value)>>1;
-    adc0_bias = (low_value2+high_value2)>>1;
-  }
+//  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
+//  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
+//  {
+//    signal_pwm_counter = 125+phase_shift_corr;
+//    signal_begin_time = CpuTimer1.InterruptCount;
+//    GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
+//
+//    low_value = adc_value_aver_1;
+//    low_value2 = adc_value_aver_0;
+//    adc1_bias = (low_value+high_value)>>1;
+//    adc0_bias = (low_value2+high_value2)>>1;
+//  }
 
   //
   // Acknowledge this interrupt to get more from group 1
@@ -824,16 +888,16 @@ __interrupt void xint1_isr(void)
 //
 __interrupt void xint2_isr(void)
 {
-  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
-  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
-  {
-    signal_pwm_counter = phase_shift_corr;
-    signal_begin_time = CpuTimer1.InterruptCount;
-    GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
-
-    high_value = adc_value_aver_1;
-    high_value2 = adc_value_aver_0;
-  }
+//  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
+//  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
+//  {
+//    signal_pwm_counter = phase_shift_corr;
+//    signal_begin_time = CpuTimer1.InterruptCount;
+//    GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
+//
+//    high_value = adc_value_aver_1;
+//    high_value2 = adc_value_aver_0;
+//  }
 
   //
   // Acknowledge this interrupt to get more from group 1
