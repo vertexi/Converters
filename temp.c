@@ -1,4 +1,4 @@
-// try use spwm table track input voltage instead of the sensor value
+// single phase rectifier with DC output constrain
 
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
@@ -57,7 +57,8 @@ void initPWM();
 void InitGPIO(void);
 void initTimer();
 void initMyAdc();
-void get_PI_signal0(float *error_list);
+void get_PI_signal0(int32_t *error_list);
+void get_PI_signal1(float *error_list);
 void change_duty(void);
 void get_adc_values(void);
 //void get_PI_signal1(float *error_list);
@@ -72,8 +73,8 @@ int INIT_DUTY0 = 10; // for pwm1
 int INIT_DUTY1 = 10; // for pwm2
 int INIT_DUTY2 = 10; // for pwm2
 #define INIT_PI0 10; //
-#define INIT_PI1 1; //
-float error_list0[3] = {1,1,1};
+#define INIT_PI1 0.3; //
+int32_t error_list0[3] = {1,1,1};
 float error_list1[3] = {0,0,0};
 
 #define sample_size 12
@@ -101,20 +102,23 @@ float intercept2 = -0.02822; //current2
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
-double adc_value0 = 0; // current1
+float adc_value0 = 0; // current1
 float adc_value1 = 0; // voltage
-float adc_value2 = 0; // current2
+float adc_value2 = 0; // dc voltage
 
-float target_0 = 8; // expect value for valtage
-float target_k = 1; // current 1/ current 2
+float target_0 = 0; // expect value for current
+float target_k = 1; // virtual signal multiplier
+float target_dc = 10; // expect dc output voltage
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (1200)
-#define ADC_PERIOD 200
-float T_sam = 0.000200;
+#define EPWM1_PRD (2400)
+#define ADC_PERIOD 300
+float T_sam = 0.000300;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
+float P_arg1 = 0.05;
+float I_arg1 = 0;
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -165,6 +169,8 @@ uint8_t PID_cal = 0;
 
 uint16_t signal_pwm_counter = 125;
 uint32_t signal_begin_time = 0;
+
+uint32_t PID_counter = 0;
 
 // Main
 void main(void)
@@ -235,9 +241,14 @@ void main(void)
     if (PID_cal == 1)
     {
       PID_cal = 0;
+      PID_counter++;
       get_adc_values();
       get_PI_signal0(error_list0);
       change_duty();
+      if (PID_counter%100==0)
+      {
+        //get_PI_signal1(error_list1);
+      }
     }
   }
 }
@@ -311,9 +322,11 @@ void InitGPIO(void)
 {
   EALLOW;
 
-  GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;    // Disable pull-up on GPIO2
-  GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 0;   // Configure GPIO2 not as EPWM2A
-  GpioCtrlRegs.GPADIR.bit.GPIO2 = 1;    // Configure GPIO2 as output
+  GpioCtrlRegs.GPAPUD.bit.GPIO19 = 1;    // Disable pull-up on GPIO19
+  GpioCtrlRegs.GPAMUX2.bit.GPIO19 = 0;   // Configure GPIO19
+  GpioDataRegs.GPADAT.bit.GPIO19 = 1;    // GPIO19 high state
+  GpioCtrlRegs.GPADIR.bit.GPIO19 = 1;    // Configure GPIO2 as output
+  GpioDataRegs.GPASET.bit.GPIO19 = 1;    // GPIO19 is low
 
   EDIS;
 }
@@ -465,7 +478,7 @@ void initMyAdc()
   // then SOC1, then SOC2
   AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 3;
   // set SOC2 start trigger on timer2, due to round-robin SOC0 converts first
-  // then SOC1, then SOC2
+  // then SOC2, then SOC3
   AdcRegs.ADCSOC3CTL.bit.TRIGSEL  = 3;
 
   // 设置采样时钟窗口
@@ -653,9 +666,9 @@ int32_t adc_value_aver_2 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+  adc_value_aver_0 = AdcResult.ADCRESULT2;
+  adc_value_aver_1 = AdcResult.ADCRESULT1;
+  adc_value_aver_2 = AdcResult.ADCRESULT3;
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
   PID_cal = 1;
@@ -675,10 +688,10 @@ float virtual_signal = 0;
 int16_t adc_value1_buffer[200];
 uint8_t adc_value1_counter = 0;
 
-double adc_value0_buffer[200];
+int16_t adc_value0_buffer[200];
 uint8_t adc_value0_counter = 0;
 
-double adc_value2_buffer[200];
+int16_t adc_value2_buffer[200];
 uint8_t adc_value2_counter = 0;
 
 int16_t target0_buffer[200];
@@ -696,15 +709,15 @@ int16_t counter_counter = 0;
 int32_t adc1_bias = 2000;
 int32_t adc0_bias = 2000;
 
-int32_t current_adc1_bias = 1700;
-int32_t current_adc0_bias = 1880;
+int32_t current_adc1_bias = 1760;
+int32_t current_adc0_bias = 1890;
 void get_adc_values(void)
 {
   adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
   adc_value1_buffer[adc_value1_counter] = adc_value1;
   (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
-  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003418; // current
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*3; // current
   adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 
@@ -716,22 +729,22 @@ void get_adc_values(void)
 //  {
 //    signal_begin_time = CpuTimer1.InterruptCount-124;
 //  }
-//  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
-//  if (temp_counter > (spwm_size-1))
-//  {
-//    temp_counter -= spwm_size;
-//  }
-//  virtual_signal = spwm_table[temp_counter];
-//
-//  counter_buffer[counter_counter] = temp_counter;
-//  (counter_counter == 200-1) ? (counter_counter = 0) : (counter_counter++);
-//
-//  target_0 = virtual_signal * voltage_k;
-//  target0_buffer[target0_counter] = target_0;
-//  (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
-//
-//  differ_buffer[differ_counter] = target_0 - adc_value1;
-//  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
+  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
+  if (temp_counter > (spwm_size-1))
+  {
+    temp_counter -= spwm_size;
+  }
+  virtual_signal = spwm_table[temp_counter];
+
+  counter_buffer[counter_counter] = temp_counter;
+  (counter_counter == 200-1) ? (counter_counter = 0) : (counter_counter++);
+
+  target_0 = virtual_signal * voltage_k;
+  target0_buffer[target0_counter] = target_0;
+  (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
+
+  differ_buffer[differ_counter] = target_0 - adc_value1;
+  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
 
 //  toltal_buffer[toltal_counter] = adc_value1;
 //  toltal_buffer[toltal_counter+1] = target_0;
@@ -743,10 +756,110 @@ float I_error0 = 0;
 int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision = 1;
-double geiding = 3;
-void get_PI_signal0(float *error_list)
+void get_PI_signal0(int32_t *error_list)
 {
-  PI0_decision = ((adc_value0/geiding)*0.5+0.5) * 100;
+  // error_list[0]  last error
+  // error_list[1]  current error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+
+  if (first_flag < 50)
+  {
+    first_flag++;
+  }
+
+  error_list[1] = target_0 - adc_value0;
+  P_error0 = P_arg0*(error_list[1] - error_list[0]);
+  //I_error0 = I_arg0*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error0;// + I_en*I_error0;
+
+  error_list[0] = error_list[1];
+
+  if (error_list[2] > PI0_HILIMIT && error_list[1] > 0)
+  {
+    I_en = 0;
+  }else if (error_list[2] < PI0_LOLIMIT && error_list[1] < 0)
+  {
+    I_en = 0;
+  }else
+  {
+    I_en = 1;
+  }
+
+  if (error_list[2] > PI0_HILIMIT)
+  {
+    if (first_flag < 50)
+    {
+      error_list[2] = INIT_PI0;
+      first_flag = 55;
+    } else
+    {
+      error_list[2] = PI0_HILIMIT;
+    }
+  } else if (error_list[2] < PI0_LOLIMIT)
+  {
+    error_list[2] = PI0_LOLIMIT;
+  }
+
+  PI0_decision = error_list[2];
+
+  return;
+}
+
+float P_error1 = 0;
+float I_error1 = 0;
+int PI1_HILIMIT = 3;
+int PI1_LOLIMIT = 0.1;
+float PI1_decision = 0.1;
+void get_PI_signal1(float *error_list)
+{
+  // error_list[0]  last error
+  // error_list[1]  current error
+  // error_list[2]  last PI signal
+  static int I_en = 1;
+  static int first_flag = 0;
+
+  if (first_flag < 50)
+  {
+    first_flag++;
+  }
+
+  error_list[1] = target_dc - adc_value2;
+  P_error1 = P_arg1*(error_list[1] - error_list[0]);
+  I_error1 = I_arg1*(T_sam*error_list[1]);
+  error_list[2] = error_list[2] + P_error1 + I_en*I_error1;
+
+  error_list[0] = error_list[1];
+
+  if (error_list[2] > PI1_HILIMIT && error_list[1] > 0)
+  {
+    I_en = 0;
+  }else if (error_list[2] < PI1_LOLIMIT && error_list[1] < 0)
+  {
+    I_en = 0;
+  }else
+  {
+    I_en = 1;
+  }
+
+  if (error_list[2] > PI1_HILIMIT)
+  {
+    if (first_flag < 50)
+    {
+      error_list[2] = INIT_PI1;
+      first_flag = 55;
+    } else
+    {
+      error_list[2] = PI1_HILIMIT;
+    }
+  } else if (error_list[2] < PI1_LOLIMIT)
+  {
+    error_list[2] = PI1_LOLIMIT;
+  }
+
+  PI1_decision = error_list[2];
+  voltage_k = PI1_decision;
 
   return;
 }
