@@ -100,7 +100,7 @@ float intercept2 = -0.02822; //current2
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
-float adc_value0 = 0; // current1
+double adc_value0 = 0; // current1
 float adc_value1 = 0; // voltage
 float adc_value2 = 0; // current2
 
@@ -651,7 +651,7 @@ float virtual_signal = 0;
 int16_t adc_value1_buffer[200];
 uint8_t adc_value1_counter = 0;
 
-int16_t adc_value0_buffer[200];
+double adc_value0_buffer[200];
 uint8_t adc_value0_counter = 0;
 
 int16_t target0_buffer[200];
@@ -678,7 +678,7 @@ void get_adc_values(void)
   adc_value1_buffer[adc_value1_counter] = adc_value1;
   (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
-  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*3; // current
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003418; // current
 
   adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
@@ -714,53 +714,10 @@ float I_error0 = 0;
 int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision = 1;
+double geiding = 3;
 void get_PI_signal0(float *error_list)
 {
-  // error_list[0]  last error
-  // error_list[1]  current error
-  // error_list[2]  last PI signal
-  static int I_en = 1;
-  static int first_flag = 0;
-
-  if (first_flag < 50)
-  {
-    first_flag++;
-  }
-
-  error_list[1] = target_0 - adc_value0;
-  P_error0 = P_arg0*(error_list[1] - error_list[0]);
-  I_error0 = I_arg0*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error0 + I_en*I_error0;
-
-  error_list[0] = error_list[1];
-
-  if (error_list[2] > PI0_HILIMIT && error_list[1] > 0)
-  {
-    I_en = 0;
-  }else if (error_list[2] < PI0_LOLIMIT && error_list[1] < 0)
-  {
-    I_en = 0;
-  }else
-  {
-    I_en = 1;
-  }
-
-  if (error_list[2] > PI0_HILIMIT)
-  {
-    if (first_flag < 50)
-    {
-      error_list[2] = INIT_PI0;
-      first_flag = 55;
-    } else
-    {
-      error_list[2] = PI0_HILIMIT;
-    }
-  } else if (error_list[2] < PI0_LOLIMIT)
-  {
-    error_list[2] = PI0_LOLIMIT;
-  }
-
-  PI0_decision = error_list[2];
+  PI0_decision = ((adc_value0/geiding)*0.5+0.5) * 100;
 
   return;
 }
