@@ -74,10 +74,10 @@ int INIT_DUTY2 = 10; // for pwm2
 int INIT_DUTY3 = 10; // for pwm3
 #define INIT_PI0 10; //
 #define INIT_PI1 3; //
-float error_list0[3] = {1,1,1};
-float error_list1[3] = {0,0,3};
+float error_list0[3] = {0,0,0};//{1,1,1};
+float error_list1[3] = {0,0,0};//{0,0,3};
 
-#define sample_size 12
+#define sample_size 5
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -111,13 +111,13 @@ float adc_value4 = 0;
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (3600)
+#define EPWM1_PRD (2400)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
-float P_arg1 = 0.8;
-float I_arg1 = 0.1;
+float P_arg1 = 0.8;//0.8
+float I_arg1 = 0.1;//0.1
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -233,14 +233,14 @@ void main(void)
 
   for(;;)
   {
-    //    __asm("          NOP");
-//    if (PID_cal == 1)
-//    {
-//      PID_cal = 0;
-//      get_PI_signal1(error_list1);
-//      get_PI_signal0(error_list0);
-//      change_duty();
-//    }
+        __asm("          NOP");
+    if (PID_cal == 1)
+    {
+      PID_cal = 0;
+      //get_PI_signal1(error_list1);
+      get_PI_signal0(error_list0);
+      change_duty();
+    }
   }
 }
 
@@ -437,7 +437,7 @@ void InitEPwm1Example()
   EPwm1Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
 
   // Setup compare
-  EPwm1Regs.CMPA.half.CMPA = INIT_DUTY1*EPWM1_PRD/100;
+  EPwm1Regs.CMPA.half.CMPA = (INIT_DUTY1*EPWM1_PRD)/100;
 
   // Set actions
   EPwm1Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
@@ -584,12 +584,12 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
-  adc_value_aver_0 = AdcResult.ADCRESULT2;
-  adc_value_aver_1 = AdcResult.ADCRESULT1;
-  adc_value_aver_2 = AdcResult.ADCRESULT3;
+  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+//  adc_value_aver_0 = AdcResult.ADCRESULT2;
+//  adc_value_aver_1 = AdcResult.ADCRESULT1;
+//  adc_value_aver_2 = AdcResult.ADCRESULT3;
   adc_value_aver_3 = AdcResult.ADCRESULT4;
   get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
@@ -639,24 +639,24 @@ int32_t adc0_bias = 2000;
 //int32_t current_adc1_bias = 1880;
 //int32_t current_adc2_bias = 1880;
 
-int32_t current_adc0_bias = 1655;
-int32_t current_adc1_bias = 1640;
-int32_t current_adc2_bias = 1712;
+int32_t current_adc0_bias = 1702;
+int32_t current_adc1_bias = 1738;
+int32_t current_adc2_bias = 1787;
 void get_adc_values(void)
 {
-  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.002844; // current
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003; // current
   adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 
-  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*0.003124; // current
+  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*0.003; // current
   adc_value1_buffer[adc_value1_counter] = adc_value1;
   (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
-  adc_value2 = ((adc_value_aver_2-current_adc2_bias)*3300>>12)*0.002707; // current
+  adc_value2 = ((adc_value_aver_2-current_adc2_bias)*3300>>12)*0.003; // current
   adc_value2_buffer[adc_value2_counter] = adc_value2;
   (adc_value2_counter == 200-1) ? (adc_value2_counter = 0) : (adc_value2_counter++);
 
-  adc_value3 = adc_value_aver_3*0.01712+2.724; // DC voltage
+  adc_value3 = adc_value_aver_3*0.01712+0.724; // DC voltage
   adc_value3_buffer[adc_value3_counter] = adc_value3;
   (adc_value3_counter == 200-1) ? (adc_value3_counter = 0) : (adc_value3_counter++);
 
@@ -692,8 +692,9 @@ int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision[3] = {1, 1, 1};
 double target_I = 3;
-double target_dc = 6;
-double PI1_decision = 3;
+double target_dc = 25;
+float m=1;//kongzhicanshu
+double PI1_decision = 2;
 void get_PI_signal0(float *error_list)
 {
   PI0_decision[0] = ((adc_value0/PI1_decision)*0.5+0.5) * 100;
@@ -703,10 +704,21 @@ void get_PI_signal0(float *error_list)
   return;
 }
 
+void change_duty(void)
+{
+  EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision[0]/100;
+  EPwm2Regs.CMPA.half.CMPA = EPwm2Regs.TBPRD*PI0_decision[1]/100;
+  EPwm3Regs.CMPA.half.CMPA = EPwm3Regs.TBPRD*PI0_decision[2]/100;
+}
+
 float P_error1 = 0;
 float I_error1 = 0;
-float PI1_HILIMIT = 30.0f;
-float PI1_LOLIMIT = 1.0f;
+float PI1_HILIMIT = 10.0f;
+float PI1_LOLIMIT = 0.0f;
+
+float PI1_INT_HILIMIT = 10.0f;
+float PI1_INT_LOLIMIT = -10.0f;
+
 void get_PI_signal1(float *error_list)
 {
   // error_list[0]  diff error
@@ -719,13 +731,14 @@ void get_PI_signal1(float *error_list)
     first_flag++;
   }
 
-  error_list[0] = target_dc - adc_value3;
+  error_list[0] = (target_dc - adc_value3)*m;
   error_list[1] += error_list[0];
+  error_list[1] = error_list[1];
 
-  if(error_list[1]>PI1_HILIMIT)
-      error_list[1]=PI1_HILIMIT;
-  else if(error_list[1]<PI1_LOLIMIT)
-      error_list[1]=PI1_LOLIMIT;
+  if(error_list[1]>PI1_INT_HILIMIT)
+      error_list[1]=PI1_INT_HILIMIT;
+  else if(error_list[1]<PI1_INT_LOLIMIT)
+      error_list[1]=PI1_INT_LOLIMIT;
 
   P_error1 = P_arg1*error_list[0];
   I_error1 = I_arg1*error_list[1];
@@ -751,18 +764,12 @@ void get_PI_signal1(float *error_list)
     error_list[2] = PI1_LOLIMIT;
   }
 
+  if(m!=0)
   PI1_decision = error_list[2];
+  else
+      PI1_decision =2 ;
 
   return;
-}
-
-
-
-void change_duty(void)
-{
-  EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision[0]/100;
-  EPwm2Regs.CMPA.half.CMPA = EPwm2Regs.TBPRD*PI0_decision[1]/100;
-  EPwm3Regs.CMPA.half.CMPA = EPwm3Regs.TBPRD*PI0_decision[2]/100;
 }
 
 // cpu_timer0_isr -
