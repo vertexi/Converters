@@ -1,0 +1,95 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+ADC0	buck_2802xFlash.c	/^int16_t ADC0[sample_size] = {0};$/;"	v
+ADC0_ADJ	buck_2802xFlash.c	/^float ADC0_ADJ = 0.0;$/;"	v
+ADC0_intercept	buck_2802xFlash.c	/^float ADC0_intercept = -0.0003;$/;"	v
+ADC0_slope	buck_2802xFlash.c	/^float ADC0_slope = 1.0413;$/;"	v
+ADC1	buck_2802xFlash.c	/^int16_t ADC1[sample_size] = {0};$/;"	v
+ADC1_ADJ	buck_2802xFlash.c	/^float ADC1_ADJ = 0.0;$/;"	v
+ADC1_intercept	buck_2802xFlash.c	/^float ADC1_intercept = 0.0208;$/;"	v
+ADC1_slope	buck_2802xFlash.c	/^float ADC1_slope = 1.0575;$/;"	v
+ADC2	buck_2802xFlash.c	/^int16_t ADC2[sample_size] = {0}; \/\/ The CCS compiler don't initialize array with 0$/;"	v
+ADC2_ADJ	buck_2802xFlash.c	/^float ADC2_ADJ = 0.0;$/;"	v
+ADC2_intercept	buck_2802xFlash.c	/^float ADC2_intercept = 0.0408;$/;"	v
+ADC2_slope	buck_2802xFlash.c	/^float ADC2_slope = 1.0575;$/;"	v
+ADC_PERIOD	buck_2802xFlash.c	100;"	d	file:
+ConversionCount	buck_2802xFlash.c	/^uint16_t ConversionCount;$/;"	v
+EPWM1_MAX_DB	buck_2802xFlash.c	32;"	d	file:
+EPWM1_MIN_DB	buck_2802xFlash.c	33;"	d	file:
+EPWM1_PRD	buck_2802xFlash.c	99;"	d	file:
+EPWM2_MIN_DB	buck_2802xFlash.c	34;"	d	file:
+EPwm1TimerIntCount	buck_2802xFlash.c	/^uint32_t EPwm1TimerIntCount;$/;"	v
+INIT_DUTY0	buck_2802xFlash.c	/^int INIT_DUTY0 = 70; \/\/ for pwm1$/;"	v
+INIT_DUTY1	buck_2802xFlash.c	/^int INIT_DUTY1 = 70; \/\/ for pwm2$/;"	v
+INIT_DUTY2	buck_2802xFlash.c	/^int INIT_DUTY2 = 70; \/\/ for pwm2$/;"	v
+INIT_PI0	buck_2802xFlash.c	59;"	d	file:
+INIT_PI1	buck_2802xFlash.c	60;"	d	file:
+I_arg0	buck_2802xFlash.c	/^float I_arg0 = 1000;$/;"	v
+I_arg1	buck_2802xFlash.c	/^float I_arg1 = 150;$/;"	v
+I_error0	buck_2802xFlash.c	/^float I_error0 = 0;$/;"	v
+InitEPwm1Example	buck_2802xFlash.c	/^void InitEPwm1Example()$/;"	f
+InitEPwm2Example	buck_2802xFlash.c	/^void InitEPwm2Example()$/;"	f
+InitEPwm3Example	buck_2802xFlash.c	/^void InitEPwm3Example()$/;"	f
+PI0_HILIMIT	buck_2802xFlash.c	/^int PI0_HILIMIT = 100;$/;"	v
+PI0_LOLIMIT	buck_2802xFlash.c	/^int PI0_LOLIMIT = 1;$/;"	v
+P_arg0	buck_2802xFlash.c	/^float P_arg0 = 50;$/;"	v
+P_arg1	buck_2802xFlash.c	/^float P_arg1 = 0.1;$/;"	v
+P_error0	buck_2802xFlash.c	/^float P_error0 = 0;$/;"	v
+TARGET_0_ADJ	buck_2802xFlash.c	96;"	d	file:
+TARGET_k_ADJ	buck_2802xFlash.c	97;"	d	file:
+T_sam	buck_2802xFlash.c	/^float T_sam = 0.000500;$/;"	v
+adc0_max	buck_2802xFlash.c	/^int16_t adc0_max = 0;$/;"	v
+adc0_max_p	buck_2802xFlash.c	/^int16_t adc0_max_p = 0;$/;"	v
+adc1_isr	buck_2802xFlash.c	/^__interrupt void adc1_isr(void)$/;"	f
+adc1_max_p	buck_2802xFlash.c	/^int16_t adc1_max_p = 0;$/;"	v
+adc2_max	buck_2802xFlash.c	/^int16_t adc2_max = 0;$/;"	v
+adc2_max_p	buck_2802xFlash.c	/^int16_t adc2_max_p = 0;$/;"	v
+adc_amplitude	buck_2802xFlash.c	/^float adc_amplitude = 0;$/;"	v
+adc_cal	buck_2802xFlash.c	/^uint8_t adc_cal = 0;$/;"	v
+adc_calculate	buck_2802xFlash.c	/^void adc_calculate(void)$/;"	f
+adc_cycle	buck_2802xFlash.c	/^float adc_cycle = 0;$/;"	v
+adc_cycle_buffer	buck_2802xFlash.c	/^int adc_cycle_buffer[adc_cycle_buffer_size];$/;"	v
+adc_cycle_buffer_size	buck_2802xFlash.c	564;"	d	file:
+adc_cycle_counter	buck_2802xFlash.c	/^int adc_cycle_counter = 0;$/;"	v
+adc_error_clear	buck_2802xFlash.c	/^void adc_error_clear(void)$/;"	f
+adc_max	buck_2802xFlash.c	/^int16_t adc_max = 0;$/;"	v
+adc_max_index	buck_2802xFlash.c	/^int16_t adc_max_index = 0;$/;"	v
+adc_min	buck_2802xFlash.c	/^int16_t adc_min = 5000;$/;"	v
+adc_min_index	buck_2802xFlash.c	/^int16_t adc_min_index = 0;$/;"	v
+adc_phase	buck_2802xFlash.c	/^float adc_phase = 0;$/;"	v
+adc_value0	buck_2802xFlash.c	/^float adc_value0 = 0;\/\/ voltage1 47kohm\/10kohm$/;"	v
+adc_value1	buck_2802xFlash.c	/^float adc_value1 = 0;\/\/ current1$/;"	v
+adc_value2	buck_2802xFlash.c	/^float adc_value2 = 0;\/\/ current2$/;"	v
+adc_value3	buck_2802xFlash.c	/^float adc_value3 = 0;\/\/ current1\/current2$/;"	v
+adc_vol0	buck_2802xFlash.c	/^volatile float adc_vol0 = 0;$/;"	v
+adc_vol1	buck_2802xFlash.c	/^volatile float adc_vol1 = 0;$/;"	v
+adc_vol2	buck_2802xFlash.c	/^volatile float adc_vol2 = 0;$/;"	v
+cpu_timer0_isr	buck_2802xFlash.c	/^__interrupt void cpu_timer0_isr(void)$/;"	f
+cpu_timer1_isr	buck_2802xFlash.c	/^__interrupt void cpu_timer1_isr(void)$/;"	f
+cpu_timer2_isr	buck_2802xFlash.c	/^__interrupt void cpu_timer2_isr(void)$/;"	f
+epwm1_isr	buck_2802xFlash.c	/^__interrupt void epwm1_isr(void)$/;"	f
+error_list0	buck_2802xFlash.c	/^float error_list0[3] = {1,1,1};$/;"	v
+error_list1	buck_2802xFlash.c	/^float error_list1[3] = {0,0,0};$/;"	v
+get_PI_signal0	buck_2802xFlash.c	/^void get_PI_signal0(float *error_list)$/;"	f
+initMyAdc	buck_2802xFlash.c	/^void initMyAdc()$/;"	f
+initPWM	buck_2802xFlash.c	/^void initPWM()$/;"	f
+initTimer	buck_2802xFlash.c	/^void initTimer()$/;"	f
+intercept0	buck_2802xFlash.c	/^float intercept0 = -1.2200;  \/\/valtage1$/;"	v
+intercept1	buck_2802xFlash.c	/^float intercept1 = -0.14471; \/\/current1$/;"	v
+intercept2	buck_2802xFlash.c	/^float intercept2 = -0.02822; \/\/current2$/;"	v
+main	buck_2802xFlash.c	/^void main(void)$/;"	f
+phase1_amplitude	buck_2802xFlash.c	/^float phase1_amplitude = 0;$/;"	v
+phase1_freq	buck_2802xFlash.c	/^float phase1_freq = 50;$/;"	v
+phase1_phase	buck_2802xFlash.c	/^float phase1_phase = 0;$/;"	v
+sample_size	buck_2802xFlash.c	64;"	d	file:
+slope0	buck_2802xFlash.c	/^float slope0 = 5.5678;$/;"	v
+slope1	buck_2802xFlash.c	/^float slope1 = 0.8967;$/;"	v
+slope2	buck_2802xFlash.c	/^float slope2 = 0.750788;$/;"	v
+spwm_size	buck_2802xFlash.c	107;"	d	file:
+spwm_table	buck_2802xFlash.c	/^uint16_t spwm_table[spwm_size] = {2160 , 2159 , 2158 , 2156 , 2153 , 2150 ,$/;"	v
+target_0	buck_2802xFlash.c	/^float target_0 = 8; \/\/ expect value for valtage$/;"	v
+target_k	buck_2802xFlash.c	/^float target_k = 1; \/\/ current 1\/ current 2$/;"	v
