@@ -75,7 +75,7 @@ int INIT_DUTY3 = 10; // for pwm3
 float error_list0[3] = {0,0,0};//{1,1,1};
 float error_list1[3] = {0,0,0};//{0,0,3};
 
-#define sample_size 5
+#define sample_size 32
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -227,7 +227,7 @@ void main(void)
 
   for(;;)
   {
-        __asm("          NOP");
+//    __asm("          NOP");
     if (PID_cal == 1)
     {
       PID_cal = 0;
@@ -378,7 +378,7 @@ void initMyAdc()
   // 设定 SOC 的采样源引脚
   // set SOC0 channel select to ADCINA6
   AdcRegs.ADCSOC0CTL.bit.CHSEL  = 1;
-  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4; // current 1
+  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 7; // DC voltage
 
   // 设置为 EOC 采样的触发条件，5为epwm1 soca, 1为 timer0
   // 现在我想要全手动软件控制，即为 0 ， software only.
@@ -572,7 +572,7 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+  adc_value_aver_0 = pre_storage_adc0()/sample_size;  // DC voltage
 //  adc_value_aver_1 = pre_storage_adc1()/sample_size;
 //  adc_value_aver_2 = pre_storage_adc2()/sample_size;
 //  adc_value_aver_0 = AdcResult.ADCRESULT2;
@@ -632,7 +632,7 @@ int32_t current_adc1_bias = 1760;
 int32_t current_adc2_bias = 1790;
 void get_adc_values(void)
 {
-  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003; // current
+  adc_value0 = 0.02116*(adc_value_aver_0*3300>>12)+0.9837; // DC voltage
   adc_value0_buffer[adc_value0_counter] = adc_value_aver_0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 }
@@ -652,11 +652,11 @@ void change_duty(void)
 
 float P_error1 = 0;
 float I_error1 = 0;
-float PI1_HILIMIT = 95.0f;
+float PI1_HILIMIT = 99.0f;
 float PI1_LOLIMIT = 3.0f;
 
-float PI1_INT_HILIMIT = 10.0f;
-float PI1_INT_LOLIMIT = -10.0f;
+float PI1_INT_HILIMIT = 1500.0f;
+float PI1_INT_LOLIMIT = -1500.0f;
 
 int PI1_I_en = 1;
 
@@ -676,7 +676,7 @@ void get_PI_signal1(float *error_list)
   error_list[1] += (PI1_I_en*error_list[0]);
   P_error1 = P_arg1*error_list[0];
   I_error1 = I_arg1*error_list[1];
-  error_list[2] = P_error1 + PI1_I_en*I_error1;
+  error_list[2] = P_error1 + I_error1;
   if(((error_list[2]>PI1_HILIMIT) && (I_error1 > 0)) || ((error_list[2]<PI1_LOLIMIT) && (I_error1 < 0)))
   {
       PI1_I_en = 0;
@@ -684,16 +684,25 @@ void get_PI_signal1(float *error_list)
       PI1_I_en = 1;
   }
 
-  if (error_list[2] > PI1_HILIMIT)
+  PI1_decision = error_list[2];
+
+  if (error_list[1] > PI1_INT_HILIMIT)
   {
-    error_list[2] = PI1_HILIMIT;
+    error_list[1] = PI1_INT_HILIMIT;
   }
-  else if (error_list[2] < PI1_LOLIMIT)
+  else if (error_list[1] < PI1_INT_LOLIMIT)
   {
-    error_list[2] = PI1_LOLIMIT;
+    error_list[1] = PI1_INT_LOLIMIT;
   }
 
-  PI1_decision = error_list[2];
+  if (PI1_decision > PI1_HILIMIT)
+  {
+    PI1_decision = PI1_HILIMIT;
+  }
+  else if (PI1_decision < PI1_LOLIMIT)
+  {
+    PI1_decision = PI1_LOLIMIT;
+  }
 
   return;
 }
