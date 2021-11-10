@@ -77,7 +77,7 @@ int INIT_DUTY3 = 10; // for pwm3
 float error_list0[3] = {0,0,0};//{1,1,1};
 float error_list1[3] = {0,0,0};//{0,0,3};
 
-#define sample_size 5
+#define sample_size 4
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -112,7 +112,7 @@ float adc_value4 = 0;
 #define TARGET_k_ADJ 0;
 
 #define EPWM1_PRD (3600)
-#define ADC_PERIOD 500
+#define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
@@ -234,7 +234,7 @@ void main(void)
 
   for(;;)
   {
-        __asm("          NOP");
+//        __asm("          NOP");
     if (PID_cal == 1)
     {
       PID_cal = 0;
@@ -589,12 +589,12 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-  adc_value_aver_2 = pre_storage_adc2()/sample_size;
-//  adc_value_aver_0 = AdcResult.ADCRESULT2;
-//  adc_value_aver_1 = AdcResult.ADCRESULT1;
-//  adc_value_aver_2 = AdcResult.ADCRESULT3;
+//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+  adc_value_aver_0 = AdcResult.ADCRESULT2;
+  adc_value_aver_1 = AdcResult.ADCRESULT1;
+  adc_value_aver_2 = AdcResult.ADCRESULT3;
   adc_value_aver_3 = AdcResult.ADCRESULT4;
   get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
@@ -644,9 +644,9 @@ int32_t adc0_bias = 2000;
 //int32_t current_adc1_bias = 1880;
 //int32_t current_adc2_bias = 1880;
 
-int32_t current_adc0_bias = 1860;
-int32_t current_adc1_bias = 1760;
-int32_t current_adc2_bias = 1790;
+int32_t current_adc0_bias = 1930;
+int32_t current_adc1_bias = 1860;
+int32_t current_adc2_bias = 1860;
 void get_adc_values(void)
 {
   adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003; // current
@@ -702,9 +702,9 @@ int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision[3] = {1, 1, 1};
 double target_I = 3;
-double target_dc = 22;
+double target_dc = 45;
 float m=1;//kongzhicanshu
-double PI1_decision = 2;
+double PI1_decision = 4;
 void get_PI_signal0(float *error_list)
 {
   PI0_decision[0] = ((adc_value0/PI1_decision)*0.5+0.5) * 100;
