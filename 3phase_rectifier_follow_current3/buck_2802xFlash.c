@@ -77,7 +77,7 @@ int INIT_DUTY3 = 10; // for pwm3
 float error_list0[3] = {0,0,0};//{1,1,1};
 float error_list1[3] = {0,0,0};//{0,0,3};
 
-#define sample_size 4
+#define sample_size 3
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -111,7 +111,7 @@ float adc_value4 = 0;
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (3600)
+#define EPWM1_PRD (2400)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
@@ -589,12 +589,12 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
-  adc_value_aver_0 = AdcResult.ADCRESULT2;
-  adc_value_aver_1 = AdcResult.ADCRESULT1;
-  adc_value_aver_2 = AdcResult.ADCRESULT3;
+  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+//  adc_value_aver_0 = AdcResult.ADCRESULT2;
+//  adc_value_aver_1 = AdcResult.ADCRESULT1;
+//  adc_value_aver_2 = AdcResult.ADCRESULT3;
   adc_value_aver_3 = AdcResult.ADCRESULT4;
   get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
@@ -644,9 +644,17 @@ int32_t adc0_bias = 2000;
 //int32_t current_adc1_bias = 1880;
 //int32_t current_adc2_bias = 1880;
 
+//int32_t current_adc0_bias = 1930;
+//int32_t current_adc1_bias = 1860;
+//int32_t current_adc2_bias = 1860;
+
+//int32_t current_adc0_bias = 1890;
+//int32_t current_adc1_bias = 1810;
+//int32_t current_adc2_bias = 1810;
+
 int32_t current_adc0_bias = 1930;
-int32_t current_adc1_bias = 1860;
-int32_t current_adc2_bias = 1860;
+int32_t current_adc1_bias = 1850;
+int32_t current_adc2_bias = 1850;
 void get_adc_values(void)
 {
   adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003; // current
@@ -698,11 +706,11 @@ void get_adc_values(void)
 
 float P_error0 = 0;
 float I_error0 = 0;
-int PI0_HILIMIT = 90;
-int PI0_LOLIMIT = 1;
+int PI0_HILIMIT = 85;
+int PI0_LOLIMIT = 10;
 uint32_t PI0_decision[3] = {1, 1, 1};
 double target_I = 3;
-double target_dc = 45;
+double target_dc = 50;
 float m=1;//kongzhicanshu
 double PI1_decision = 4;
 void get_PI_signal0(float *error_list)
@@ -724,7 +732,7 @@ void change_duty(void)
 float P_error1 = 0.8;
 float I_error1 = 0.01;
 float PI1_HILIMIT = 4.0f;
-float PI1_LOLIMIT = 0.0f;
+float PI1_LOLIMIT = 0.3f;
 
 float PI1_INT_HILIMIT = 10.0f;
 float PI1_INT_LOLIMIT = -10.0f;
