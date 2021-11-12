@@ -111,7 +111,7 @@ float adc_value4 = 0;
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (2400)
+#define EPWM1_PRD (3600)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
@@ -589,12 +589,12 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-  adc_value_aver_1 = pre_storage_adc1()/sample_size;
-  adc_value_aver_2 = pre_storage_adc2()/sample_size;
-//  adc_value_aver_0 = AdcResult.ADCRESULT2;
-//  adc_value_aver_1 = AdcResult.ADCRESULT1;
-//  adc_value_aver_2 = AdcResult.ADCRESULT3;
+//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+  adc_value_aver_0 = AdcResult.ADCRESULT2;
+  adc_value_aver_1 = AdcResult.ADCRESULT1;
+  adc_value_aver_2 = AdcResult.ADCRESULT3;
   adc_value_aver_3 = AdcResult.ADCRESULT4;
   get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
