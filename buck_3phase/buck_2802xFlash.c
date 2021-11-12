@@ -632,7 +632,7 @@ int32_t current_adc1_bias = 1760;
 int32_t current_adc2_bias = 1790;
 void get_adc_values(void)
 {
-  adc_value0 = 0.010346*adc_value_aver_0+0.06973; // DC voltage
+  adc_value0 = 0.010346*adc_value_aver_0; // DC voltage
   adc_value0_buffer[adc_value0_counter] = adc_value_aver_0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 }
