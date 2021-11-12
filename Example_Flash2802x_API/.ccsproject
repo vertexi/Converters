@@ -9,4 +9,6 @@
 	<defaultAssemblyOnly value="false"/>
 	<deviceFamily value="C2000"/>
 	<origin value="C:/ti/c2000/C2000Ware_3_02_00_00/libraries/flash_api/f2802x/example_ccsv5"/>
+	<connection value="common/targetdb/connections/TIXDS100v2_Connection.xml"/>
+	<isTargetManual value="false"/>
 </projectOptions>

@@ -16,10 +16,19 @@
 #pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc1, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc2, "ramfuncs");
+#pragma DATA_SECTION(temp_a, "xfile");
+#pragma DATA_SECTION(x, "xfile");
+static int x[5];
+
+#pragma DATA_SECTION(y, "xfile");
+static int y = 0x4545;
+
+#pragma DATA_SECTION(z, "xfile");
+static long z = 0x12345678;
 
 //#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 //#pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
-
+int16_t temp_a = 10;
 // Function Prototypes
 __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -179,6 +188,9 @@ void main(void)
     ADC2[i] = 0;
   }
 
+  x[0] = 2;
+  x[1] = 3;
+  x[2] = 4;
   error_list0[2] = INIT_PI0;
 
   // Step 1. Initialize System Control:
@@ -632,7 +644,7 @@ int32_t current_adc1_bias = 1760;
 int32_t current_adc2_bias = 1790;
 void get_adc_values(void)
 {
-  adc_value0 = 0.010346*adc_value_aver_0+0.06973; // DC voltage
+  adc_value0 = 0.02116*(adc_value_aver_0*3300>>12)+0.9837; // DC voltage
   adc_value0_buffer[adc_value0_counter] = adc_value_aver_0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
 }
