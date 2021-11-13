@@ -1,4 +1,4 @@
-// try use spwm table track input voltage instead of the sensor value
+// single phase AC-DC using one-cycle control method
 
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File

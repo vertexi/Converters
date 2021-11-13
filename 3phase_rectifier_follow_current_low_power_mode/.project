@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>buck_3phase_change_voltage</name>
+	<name>3phase_rectifier_follow_current_low_power_mode</name>
 	<comment></comment>
 	<projects>
 	</projects>

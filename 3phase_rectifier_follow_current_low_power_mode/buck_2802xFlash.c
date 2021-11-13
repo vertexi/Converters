@@ -1,4 +1,4 @@
-// true 3-phase
+// three phase AC-DC using one-cycle control with shutdown signal control
 
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
@@ -11,24 +11,16 @@
 #pragma CODE_SECTION(adc1_isr, "ramfuncs");
 #pragma CODE_SECTION(adc_calculate, "ramfuncs");
 #pragma CODE_SECTION(adc_error_clear, "ramfuncs");
+#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 #pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
 #pragma CODE_SECTION(get_adc_values, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc0, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc1, "ramfuncs");
 #pragma CODE_SECTION(pre_storage_adc2, "ramfuncs");
-#pragma DATA_SECTION(temp_a, "xfile");
-#pragma DATA_SECTION(x, "xfile");
-static int x[5];
-
-#pragma DATA_SECTION(y, "xfile");
-static int y = 0x4545;
-
-#pragma DATA_SECTION(z, "xfile");
-static long z = 0x12345678;
 
 //#pragma CODE_SECTION(get_PI_signal0, "ramfuncs");
 //#pragma CODE_SECTION(get_PI_signal1, "ramfuncs");
-int16_t temp_a = 10;
+
 // Function Prototypes
 __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -66,6 +58,7 @@ void initPWM();
 void InitGPIO(void);
 void initTimer();
 void initMyAdc();
+void get_PI_signal0(float *error_list);
 void change_duty(void);
 void get_adc_values(void);
 void get_PI_signal1(float *error_list);
@@ -84,7 +77,7 @@ int INIT_DUTY3 = 10; // for pwm3
 float error_list0[3] = {0,0,0};//{1,1,1};
 float error_list1[3] = {0,0,0};//{0,0,3};
 
-#define sample_size 32
+#define sample_size 3
 int16_t ADC0[sample_size] = {0};
 int16_t ADC1[sample_size] = {0};
 int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
@@ -109,7 +102,11 @@ float intercept2 = -0.02822; //current2
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
-float adc_value0 = 0; // voltage
+float adc_value0 = 0; // current0
+float adc_value1 = 0; // current1
+float adc_value2 = 0; // current2
+float adc_value3 = 0; // dc voltage
+float adc_value4 = 0;
 
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
@@ -119,8 +116,8 @@ float adc_value0 = 0; // voltage
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
-float P_arg1 = 0.8;//0.8
-float I_arg1 = 0.1;//0.1
+float P_arg1 = 0.1;//0.8
+float I_arg1 = 0.001;//0.1
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -173,6 +170,7 @@ uint16_t signal_pwm_counter = 125;
 uint32_t signal_begin_time = 0;
 
 // Main
+
 void main(void)
 {
   // WARNING: Always ensure you call memcpy before running any functions from
@@ -188,9 +186,6 @@ void main(void)
     ADC2[i] = 0;
   }
 
-  x[0] = 2;
-  x[1] = 3;
-  x[2] = 4;
   error_list0[2] = INIT_PI0;
 
   // Step 1. Initialize System Control:
@@ -227,8 +222,8 @@ void main(void)
   InitPieVectTable();
 
   InitEPwm1Gpio();
-  //InitEPwm2Gpio();
-  //InitEPwm3Gpio();
+  InitEPwm2Gpio();
+  InitEPwm3Gpio();
   InitGPIO();
   // InitExternalInt();
 
@@ -239,11 +234,20 @@ void main(void)
 
   for(;;)
   {
-//    __asm("          NOP");
+//        __asm("          NOP");
+    if(GpioDataRegs.GPADAT.bit.GPIO6 == 1)
+    {
+      GpioDataRegs.GPASET.bit.GPIO7 = 1;   // GPIO7 is high
+    }
+    if(GpioDataRegs.GPADAT.bit.GPIO6 == 0)
+    {
+      GpioDataRegs.GPACLEAR.bit.GPIO7 = 1;   // GPIO7 is low
+    }
     if (PID_cal == 1)
     {
       PID_cal = 0;
       get_PI_signal1(error_list1);
+      get_PI_signal0(error_list0);
       change_duty();
     }
   }
@@ -251,12 +255,21 @@ void main(void)
 
 void InitGPIO(void)
 {
-  EALLOW;
-  GpioCtrlRegs.GPAMUX2.bit.GPIO19 = 0;        // GPIO
-  GpioDataRegs.GPADAT.bit.GPIO19 = 0;
-  GpioCtrlRegs.GPADIR.bit.GPIO19 = 1;         // output
-  GpioDataRegs.GPACLEAR.bit.GPIO19 = 1;
-  EDIS;
+    EALLOW;
+      GpioCtrlRegs.GPAMUX1.bit.GPIO7 = 0;        // GPIO
+      GpioDataRegs.GPADAT.bit.GPIO7 = 0;
+      GpioCtrlRegs.GPADIR.bit.GPIO7 = 1;         // output
+      GpioDataRegs.GPACLEAR.bit.GPIO7 = 1;
+
+      //
+      // Make GPIO6 an input
+      //
+      GpioCtrlRegs.GPAPUD.bit.GPIO6 = 0;      // enable pullup on GPIO6
+      GpioCtrlRegs.GPAMUX1.bit.GPIO6 = 0;     // GPIO
+      GpioCtrlRegs.GPADIR.bit.GPIO6 = 0;      // input
+      GpioCtrlRegs.GPAQSEL1.bit.GPIO6 = 1;    // XINT1 Synch to SYSCLKOUT only
+      GpioCtrlRegs.GPACTRL.bit.QUALPRD0 = 0x6F;  // qualification period
+      EDIS;
 }
 
 void initPWM()
@@ -277,8 +290,8 @@ void initPWM()
   EDIS;
 
   InitEPwm1Example();
-  //InitEPwm2Example();
-  //InitEPwm3Example();
+  InitEPwm2Example();
+  InitEPwm3Example();
 
   EALLOW;
   SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -384,13 +397,16 @@ void initMyAdc()
 
   // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
   // setup EOC2 to trigger ADCINT1 to fire
-  AdcRegs.INTSEL1N2.bit.INT1SEL   = 1;
+  AdcRegs.INTSEL1N2.bit.INT1SEL   = 4;
   //    AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
 
   // 设定 SOC 的采样源引脚
   // set SOC0 channel select to ADCINA6
   AdcRegs.ADCSOC0CTL.bit.CHSEL  = 1;
-  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 7; // DC voltage
+  AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4; // current 1
+  AdcRegs.ADCSOC2CTL.bit.CHSEL  = 3; // current 0
+  AdcRegs.ADCSOC3CTL.bit.CHSEL  = 2; // current 2
+  AdcRegs.ADCSOC4CTL.bit.CHSEL  = 7; // DC
 
   // 设置为 EOC 采样的触发条件，5为epwm1 soca, 1为 timer0
   // 现在我想要全手动软件控制，即为 0 ， software only.
@@ -398,11 +414,17 @@ void initMyAdc()
   // then SOC1, SOC2, SOC3, SOC4
   AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 3;
   AdcRegs.ADCSOC1CTL.bit.TRIGSEL  = 3;
+  AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 3;
+  AdcRegs.ADCSOC3CTL.bit.TRIGSEL  = 3;
+  AdcRegs.ADCSOC4CTL.bit.TRIGSEL  = 3;
 
   // 设置采样时钟窗口
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   AdcRegs.ADCSOC0CTL.bit.ACQPS  = 11;
   AdcRegs.ADCSOC1CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC2CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC3CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC4CTL.bit.ACQPS  = 11;
   EDIS;
 }
 
@@ -536,12 +558,12 @@ int32_t pre_storage_adc0(void)
   static int32_t adc_sum0 = 0;
   static uint8_t counter = 0;
   adc_sum0 -= ADC0[ConversionCount];
-  ADC0[ConversionCount] = AdcResult.ADCRESULT1;
-  adc_sum0 += AdcResult.ADCRESULT1;
+  ADC0[ConversionCount] = AdcResult.ADCRESULT2;
+  adc_sum0 += AdcResult.ADCRESULT2;
   if (counter < sample_size)
   {
     counter++;
-    return ((int32_t)(AdcResult.ADCRESULT1)*sample_size);
+    return ((int32_t)(AdcResult.ADCRESULT2)*sample_size);
   }
   return adc_sum0;
 }
@@ -584,13 +606,13 @@ int32_t adc_value_aver_3 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;  // DC voltage
+//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
 //  adc_value_aver_1 = pre_storage_adc1()/sample_size;
 //  adc_value_aver_2 = pre_storage_adc2()/sample_size;
-//  adc_value_aver_0 = AdcResult.ADCRESULT2;
-//  adc_value_aver_1 = AdcResult.ADCRESULT1;
-//  adc_value_aver_2 = AdcResult.ADCRESULT3;
-//  adc_value_aver_3 = AdcResult.ADCRESULT4;
+  adc_value_aver_0 = AdcResult.ADCRESULT2;
+  adc_value_aver_1 = AdcResult.ADCRESULT1;
+  adc_value_aver_2 = AdcResult.ADCRESULT3;
+  adc_value_aver_3 = AdcResult.ADCRESULT4;
   get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
@@ -639,36 +661,93 @@ int32_t adc0_bias = 2000;
 //int32_t current_adc1_bias = 1880;
 //int32_t current_adc2_bias = 1880;
 
-int32_t current_adc0_bias = 1860;
-int32_t current_adc1_bias = 1760;
-int32_t current_adc2_bias = 1790;
+//int32_t current_adc0_bias = 1930;
+//int32_t current_adc1_bias = 1860;
+//int32_t current_adc2_bias = 1860;
+
+//int32_t current_adc0_bias = 1890;
+//int32_t current_adc1_bias = 1810;
+//int32_t current_adc2_bias = 1810;
+
+int32_t current_adc0_bias = 1930;
+int32_t current_adc1_bias = 1850;
+int32_t current_adc2_bias = 1850;
 void get_adc_values(void)
 {
-  adc_value0 = 0.02116*(adc_value_aver_0*3300>>12)+0.9837; // DC voltage
-  adc_value0_buffer[adc_value0_counter] = adc_value_aver_0;
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003; // current
+  adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
+
+  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*0.003; // current
+  adc_value1_buffer[adc_value1_counter] = adc_value1;
+  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
+
+  adc_value2 = ((adc_value_aver_2-current_adc2_bias)*3300>>12)*0.003; // current
+  adc_value2_buffer[adc_value2_counter] = adc_value2;
+  (adc_value2_counter == 200-1) ? (adc_value2_counter = 0) : (adc_value2_counter++);
+
+  adc_value3 = adc_value_aver_3*0.01712+1.024; // DC voltage
+  adc_value3_buffer[adc_value3_counter] = adc_value3;
+  (adc_value3_counter == 200-1) ? (adc_value3_counter = 0) : (adc_value3_counter++);
+
+//  if ((CpuTimer1.InterruptCount-signal_begin_time) >= 125)
+//  {
+//    signal_begin_time = CpuTimer1.InterruptCount-124;
+//  }
+//  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
+//  if (temp_counter > (spwm_size-1))
+//  {
+//    temp_counter -= spwm_size;
+//  }
+//  virtual_signal = spwm_table[temp_counter];
+//
+//  counter_buffer[counter_counter] = temp_counter;
+//  (counter_counter == 200-1) ? (counter_counter = 0) : (counter_counter++);
+//
+//  target_0 = virtual_signal * voltage_k;
+//  target0_buffer[target0_counter] = target_0;
+//  (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
+//
+//  differ_buffer[differ_counter] = target_0 - adc_value1;
+//  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
+
+//  toltal_buffer[toltal_counter] = adc_value1;
+//  toltal_buffer[toltal_counter+1] = target_0;
+//  (toltal_counter == 200-2) ? (toltal_counter = 0) : (toltal_counter+=2);
 }
 
 float P_error0 = 0;
 float I_error0 = 0;
-int PI0_HILIMIT = 90;
-int PI0_LOLIMIT = 1;
-double target_dc = 36;
+int PI0_HILIMIT = 85;
+int PI0_LOLIMIT = 10;
+uint32_t PI0_decision[3] = {1, 1, 1};
+double target_I = 3;
+double target_dc = 50;
 float m=1;//kongzhicanshu
-double PI1_decision = 10;
+double PI1_decision = 4;
+void get_PI_signal0(float *error_list)
+{
+  PI0_decision[0] = ((adc_value0/PI1_decision)*0.5+0.5) * 100;
+  PI0_decision[1] = ((adc_value1/PI1_decision)*0.5+0.5) * 100;
+  PI0_decision[2] = ((adc_value2/PI1_decision)*0.5+0.5) * 100;
+
+  return;
+}
 
 void change_duty(void)
 {
-  EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI1_decision/100;
+  EPwm1Regs.CMPA.half.CMPA = EPwm1Regs.TBPRD*PI0_decision[0]/100;
+  EPwm2Regs.CMPA.half.CMPA = EPwm2Regs.TBPRD*PI0_decision[1]/100;
+  EPwm3Regs.CMPA.half.CMPA = EPwm3Regs.TBPRD*PI0_decision[2]/100;
 }
 
-float P_error1 = 0;
-float I_error1 = 0;
-float PI1_HILIMIT = 99.0f;
-float PI1_LOLIMIT = 3.0f;
+float P_error1 = 0.8;
+float I_error1 = 0.01;
+float PI1_HILIMIT = 4.0f;
+float PI1_LOLIMIT = 0.3f;
 
-float PI1_INT_HILIMIT = 1500.0f;
-float PI1_INT_LOLIMIT = -1500.0f;
+float PI1_INT_HILIMIT = 10.0f;
+float PI1_INT_LOLIMIT = -10.0f;
 
 int PI1_I_en = 1;
 
@@ -684,11 +763,11 @@ void get_PI_signal1(float *error_list)
     first_flag++;
   }
 
-  error_list[0] = target_dc - adc_value0;
+  error_list[0] = target_dc - adc_value3;
   error_list[1] += (PI1_I_en*error_list[0]);
   P_error1 = P_arg1*error_list[0];
   I_error1 = I_arg1*error_list[1];
-  error_list[2] = P_error1 + I_error1;
+  error_list[2] = P_error1+I_error1;
   if(((error_list[2]>PI1_HILIMIT) && (I_error1 > 0)) || ((error_list[2]<PI1_LOLIMIT) && (I_error1 < 0)))
   {
       PI1_I_en = 0;
@@ -696,25 +775,16 @@ void get_PI_signal1(float *error_list)
       PI1_I_en = 1;
   }
 
+  if (error_list[2] > PI1_HILIMIT)
+  {
+    error_list[2] = PI1_HILIMIT;
+  }
+  else if (error_list[2] < PI1_LOLIMIT)
+  {
+    error_list[2] = PI1_LOLIMIT;
+  }
+
   PI1_decision = error_list[2];
-
-  if (error_list[1] > PI1_INT_HILIMIT)
-  {
-    error_list[1] = PI1_INT_HILIMIT;
-  }
-  else if (error_list[1] < PI1_INT_LOLIMIT)
-  {
-    error_list[1] = PI1_INT_LOLIMIT;
-  }
-
-  if (PI1_decision > PI1_HILIMIT)
-  {
-    PI1_decision = PI1_HILIMIT;
-  }
-  else if (PI1_decision < PI1_LOLIMIT)
-  {
-    PI1_decision = PI1_LOLIMIT;
-  }
 
   return;
 }
