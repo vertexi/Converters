@@ -3,4 +3,5 @@
 <projectOptions>
 	<deviceFamily value="C2000"/>
 	<origin value="C:/ti/c2000/C2000Ware_3_02_00_00/device_support/f2802x/examples/structs/epwm_deadband"/>
+	<isTargetManual value="false"/>
 </projectOptions>

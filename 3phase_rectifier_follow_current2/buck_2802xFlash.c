@@ -1,4 +1,4 @@
-// try use spwm table track input voltage instead of the sensor value
+// single phase AC-DC using one-cycle control method
 
 // Included Files
 #include "DSP28x_Project.h"     // Device Headerfile and Examples Include File
@@ -58,7 +58,7 @@ void initMyAdc();
 void get_PI_signal0(float *error_list);
 void change_duty(void);
 void get_adc_values(void);
-//void get_PI_signal1(float *error_list);
+void get_PI_signal1(float *error_list);
 
 int32_t pre_storage_adc0(void);
 int32_t pre_storage_adc1(void);
@@ -70,13 +70,14 @@ int INIT_DUTY0 = 10; // for pwm1
 int INIT_DUTY1 = 10; // for pwm2
 int INIT_DUTY2 = 10; // for pwm2
 #define INIT_PI0 10; //
-#define INIT_PI1 1; //
+#define INIT_PI1 3; //
 float error_list0[3] = {1,1,1};
-float error_list1[3] = {0,0,0};
+float error_list1[3] = {0,0,3};
 
 #define sample_size 12
 int16_t ADC0[sample_size] = {0};
-int16_t ADC1[sample_size] = {0}; // The CCS compiler don't initialize array with 0
+int16_t ADC1[sample_size] = {0};
+int16_t ADC2[sample_size] = {0}; // The CCS compiler don't initialize array with 0
 
 float ADC0_slope = 1.0413;
 float ADC0_intercept = -0.0003;
@@ -98,7 +99,7 @@ float intercept2 = -0.02822; //current2
 volatile float adc_vol0 = 0;
 volatile float adc_vol1 = 0;
 volatile float adc_vol2 = 0;
-float adc_value0 = 0; // current1
+double adc_value0 = 0; // current1
 float adc_value1 = 0; // voltage
 float adc_value2 = 0; // current2
 
@@ -107,11 +108,13 @@ float target_k = 1; // current 1/ current 2
 #define TARGET_0_ADJ 0;
 #define TARGET_k_ADJ 0;
 
-#define EPWM1_PRD (1200)
+#define EPWM1_PRD (3600)
 #define ADC_PERIOD 200
 float T_sam = 0.000200;
 float P_arg0 = 0.05;
 float I_arg0 = 0;
+float P_arg1 = 0.8;
+float I_arg1 = 0.1;
 
 #define spwm_size 250
 int16_t spwm_table[spwm_size] = {10   , 31   , 52   , 72   , 93   , 114  ,
@@ -191,6 +194,7 @@ void main(void)
   {
     ADC0[i] = 0;
     ADC1[i] = 0;
+    ADC2[i] = 0;
   }
 
   target_0 += TARGET_0_ADJ;
@@ -246,7 +250,7 @@ void main(void)
     if (PID_cal == 1)
     {
       PID_cal = 0;
-      get_adc_values();
+      get_PI_signal1(error_list1);
       get_PI_signal0(error_list0);
       change_duty();
     }
@@ -455,7 +459,7 @@ void initMyAdc()
 
   // 选择 EOC2 为 ADCINT1 触发，即 SOC2 对应的ADC采样完成后触发
   // setup EOC2 to trigger ADCINT1 to fire
-  AdcRegs.INTSEL1N2.bit.INT1SEL   = 2;
+  AdcRegs.INTSEL1N2.bit.INT1SEL   = 3;
   //    AdcRegs.INTSEL1N2.bit.INT2SEL   = 0; // EOC0 trigger ADCINT2
 
   // 设定 SOC 的采样源引脚
@@ -463,6 +467,7 @@ void initMyAdc()
   AdcRegs.ADCSOC0CTL.bit.CHSEL  = 6;
   AdcRegs.ADCSOC1CTL.bit.CHSEL  = 4;
   AdcRegs.ADCSOC2CTL.bit.CHSEL  = 6;
+  AdcRegs.ADCSOC3CTL.bit.CHSEL  = 2;
 
   // 设置为 EOC 采样的触发条件，5为epwm1 soca, 1为 timer0
   // 现在我想要全手动软件控制，即为 0 ， software only.
@@ -475,12 +480,16 @@ void initMyAdc()
   // set SOC2 start trigger on timer2, due to round-robin SOC0 converts first
   // then SOC1, then SOC2
   AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 3;
+  // set SOC2 start trigger on timer2, due to round-robin SOC0 converts first
+  // then SOC1, then SOC2
+  AdcRegs.ADCSOC3CTL.bit.TRIGSEL  = 3;
 
   // 设置采样时钟窗口
   // set SOC0 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
   AdcRegs.ADCSOC0CTL.bit.ACQPS  = 11;
   AdcRegs.ADCSOC1CTL.bit.ACQPS  = 11;
   AdcRegs.ADCSOC2CTL.bit.ACQPS  = 11;
+  AdcRegs.ADCSOC3CTL.bit.ACQPS  = 11;
   EDIS;
 }
 
@@ -639,13 +648,34 @@ int32_t pre_storage_adc1(void)
   return adc_sum1;
 }
 
+int32_t pre_storage_adc2(void)
+{
+  static int32_t adc_sum2 = 0;
+  static uint8_t counter = 0;
+  adc_sum2 -= ADC2[ConversionCount];
+  ADC2[ConversionCount] = AdcResult.ADCRESULT3;
+  adc_sum2 += AdcResult.ADCRESULT3;
+  if (counter < sample_size)
+  {
+    counter++;
+    return ((int32_t)(AdcResult.ADCRESULT3)*sample_size);
+  }
+  return adc_sum2;
+}
+
 int32_t adc_value_aver_0 = 0;
 int32_t adc_value_aver_1 = 0;
+int32_t adc_value_aver_2 = 0;
 
 __interrupt void adc1_isr(void)
 {
-  adc_value_aver_0 = pre_storage_adc0()/sample_size;
-  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+//  adc_value_aver_0 = pre_storage_adc0()/sample_size;
+//  adc_value_aver_1 = pre_storage_adc1()/sample_size;
+//  adc_value_aver_2 = pre_storage_adc2()/sample_size;
+    adc_value_aver_0 = AdcResult.ADCRESULT2;
+    adc_value_aver_1 = AdcResult.ADCRESULT1;
+    adc_value_aver_2 = AdcResult.ADCRESULT3;
+    get_adc_values();
   (ConversionCount == sample_size-1) ? (ConversionCount = 0) : (ConversionCount++);
 
   PID_cal = 1;
@@ -665,8 +695,11 @@ float virtual_signal = 0;
 int16_t adc_value1_buffer[200];
 uint8_t adc_value1_counter = 0;
 
-int16_t adc_value0_buffer[200];
+double adc_value0_buffer[200];
 uint8_t adc_value0_counter = 0;
+
+double adc_value2_buffer[200];
+uint8_t adc_value2_counter = 0;
 
 int16_t target0_buffer[200];
 uint8_t target0_counter = 0;
@@ -687,36 +720,38 @@ int32_t current_adc1_bias = 1750;
 int32_t current_adc0_bias = 1895;
 void get_adc_values(void)
 {
-  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
+//  adc_value1 = ((adc_value_aver_1-current_adc1_bias)*3300>>12)*3*10; // voltage
+//  adc_value1_buffer[adc_value1_counter] = adc_value1;
+//  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
 
-  adc_value1_buffer[adc_value1_counter] = adc_value1;
-  (adc_value1_counter == 200-1) ? (adc_value1_counter = 0) : (adc_value1_counter++);
-
-  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*3; // current
-
+  adc_value0 = ((adc_value_aver_0-current_adc0_bias)*3300>>12)*0.003418; // current
   adc_value0_buffer[adc_value0_counter] = adc_value0;
   (adc_value0_counter == 200-1) ? (adc_value0_counter = 0) : (adc_value0_counter++);
+
+  adc_value2 = adc_value_aver_2*0.01712+2.724; // dc voltage
+  adc_value2_buffer[adc_value2_counter] = adc_value2;
+  (adc_value2_counter == 200-1) ? (adc_value2_counter = 0) : (adc_value2_counter++);
 
 //  if ((CpuTimer1.InterruptCount-signal_begin_time) >= 125)
 //  {
 //    signal_begin_time = CpuTimer1.InterruptCount-124;
 //  }
-  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
-  if (temp_counter > (spwm_size-1))
-  {
-    temp_counter -= spwm_size;
-  }
-  virtual_signal = spwm_table[temp_counter];
-
-  counter_buffer[counter_counter] = temp_counter;
-  (counter_counter == 200-1) ? (counter_counter = 0) : (counter_counter++);
-
-  target_0 = virtual_signal * voltage_k;
-  target0_buffer[target0_counter] = target_0;
-  (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
-
-  differ_buffer[differ_counter] = target_0 - adc_value1;
-  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
+//  uint16_t temp_counter = signal_pwm_counter+(CpuTimer1.InterruptCount-signal_begin_time);
+//  if (temp_counter > (spwm_size-1))
+//  {
+//    temp_counter -= spwm_size;
+//  }
+//  virtual_signal = spwm_table[temp_counter];
+//
+//  counter_buffer[counter_counter] = temp_counter;
+//  (counter_counter == 200-1) ? (counter_counter = 0) : (counter_counter++);
+//
+//  target_0 = virtual_signal * voltage_k;
+//  target0_buffer[target0_counter] = target_0;
+//  (target0_counter == 200-1) ? (target0_counter = 0) : (target0_counter++);
+//
+//  differ_buffer[differ_counter] = target_0 - adc_value1;
+//  (differ_counter == 200-1) ? (differ_counter = 0) : (differ_counter++);
 
 //  toltal_buffer[toltal_counter] = adc_value1;
 //  toltal_buffer[toltal_counter+1] = target_0;
@@ -728,9 +763,23 @@ float I_error0 = 0;
 int PI0_HILIMIT = 90;
 int PI0_LOLIMIT = 1;
 uint32_t PI0_decision = 1;
+double geiding = 3;
+double target_dc = 6;
+double PI1_decision = 3;
 void get_PI_signal0(float *error_list)
 {
-  // error_list[0]  last error
+  PI0_decision = ((adc_value0/PI1_decision)*0.5+0.5) * 100;
+
+  return;
+}
+
+float P_error1 = 0;
+float I_error1 = 0;
+float PI1_HILIMIT = 30.0f;
+float PI1_LOLIMIT = 1.0f;
+void get_PI_signal1(float *error_list)
+{
+  // error_list[0]  diff error
   // error_list[1]  current error
   // error_list[2]  last PI signal
   static int I_en = 1;
@@ -741,43 +790,44 @@ void get_PI_signal0(float *error_list)
     first_flag++;
   }
 
-  error_list[1] = target_0 - adc_value0;
-  P_error0 = P_arg0*(error_list[1] - error_list[0]);
-  I_error0 = I_arg0*(T_sam*error_list[1]);
-  error_list[2] = error_list[2] + P_error0 + I_en*I_error0;
+  error_list[0] = target_dc - adc_value2;
+  error_list[1] += error_list[0];
 
-  error_list[0] = error_list[1];
+  if(error_list[1]>PI1_HILIMIT)
+      error_list[1]=PI1_HILIMIT;
+  else if(error_list[1]<PI1_LOLIMIT)
+      error_list[1]=PI1_LOLIMIT;
 
-  if (error_list[2] > PI0_HILIMIT && error_list[1] > 0)
+  P_error1 = P_arg1*error_list[0];
+  I_error1 = I_arg1*error_list[1];
+  error_list[2] = P_error1 + I_error1;
+
+//  if (error_list[2] > PI1_HILIMIT && I_error1 > 0)
+//  {
+//    I_en = 0;
+//  }else if (error_list[2] < PI1_LOLIMIT && I_error1 < 0)
+//  {
+//    I_en = 0;
+//  }else
+//  {
+//    I_en = 1;
+//  }
+
+  if (error_list[2] > PI1_HILIMIT)
   {
-    I_en = 0;
-  }else if (error_list[2] < PI0_LOLIMIT && error_list[1] < 0)
+    error_list[2] = PI1_HILIMIT;
+  }
+  else if (error_list[2] < PI1_LOLIMIT)
   {
-    I_en = 0;
-  }else
-  {
-    I_en = 1;
+    error_list[2] = PI1_LOLIMIT;
   }
 
-  if (error_list[2] > PI0_HILIMIT)
-  {
-    if (first_flag < 50)
-    {
-      error_list[2] = INIT_PI0;
-      first_flag = 55;
-    } else
-    {
-      error_list[2] = PI0_HILIMIT;
-    }
-  } else if (error_list[2] < PI0_LOLIMIT)
-  {
-    error_list[2] = PI0_LOLIMIT;
-  }
-
-  PI0_decision = error_list[2];
+  PI1_decision = error_list[2];
 
   return;
 }
+
+
 
 void change_duty(void)
 {
@@ -889,18 +939,18 @@ int16_t phase_shift_corr = 235;
 
 __interrupt void xint1_isr(void)
 {
-  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
-  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
-  {
-    signal_pwm_counter = 125+phase_shift_corr;
-    signal_begin_time = CpuTimer1.InterruptCount;
-    GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
-
-    low_value = adc_value_aver_1;
-    low_value2 = adc_value_aver_0;
-    adc1_bias = (low_value+high_value)>>1;
-    adc0_bias = (low_value2+high_value2)>>1;
-  }
+//  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
+//  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
+//  {
+//    signal_pwm_counter = 125+phase_shift_corr;
+//    signal_begin_time = CpuTimer1.InterruptCount;
+//    GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;   // GPIO34 is low
+//
+//    low_value = adc_value_aver_1;
+//    low_value2 = adc_value_aver_0;
+//    adc1_bias = (low_value+high_value)>>1;
+//    adc0_bias = (low_value2+high_value2)>>1;
+//  }
 
   //
   // Acknowledge this interrupt to get more from group 1
@@ -913,16 +963,16 @@ __interrupt void xint1_isr(void)
 //
 __interrupt void xint2_isr(void)
 {
-  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
-  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
-  {
-    signal_pwm_counter = phase_shift_corr;
-    signal_begin_time = CpuTimer1.InterruptCount;
-    GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
-
-    high_value = adc_value_aver_1;
-    high_value2 = adc_value_aver_0;
-  }
+//  temp_see = CpuTimer1.InterruptCount - signal_begin_time;
+//  if (temp_see > temp_th_hi || temp_see < temp_th_lo)
+//  {
+//    signal_pwm_counter = phase_shift_corr;
+//    signal_begin_time = CpuTimer1.InterruptCount;
+//    GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // GPIO34 is high
+//
+//    high_value = adc_value_aver_1;
+//    high_value2 = adc_value_aver_0;
+//  }
 
   //
   // Acknowledge this interrupt to get more from group 1
