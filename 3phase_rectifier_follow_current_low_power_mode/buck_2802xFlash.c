@@ -756,13 +756,6 @@ void get_PI_signal1(float *error_list)
   // error_list[0]  diff error
   // error_list[1]  current error
   // error_list[2]  last PI signal
-  static int first_flag = 0;
-
-  if (first_flag < 50)
-  {
-    first_flag++;
-  }
-
   error_list[0] = target_dc - adc_value3;
   error_list[1] += (PI1_I_en*error_list[0]);
   P_error1 = P_arg1*error_list[0];
